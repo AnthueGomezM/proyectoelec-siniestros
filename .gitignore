@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+*.egg-info/
+eval/resultados/*.local.json
+.DS_Store

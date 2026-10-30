@@ -1,0 +1,521 @@
+{
+  "resumen": {
+    "fecha": "2026-10-23 00:42 UTC",
+    "proveedor": "offline",
+    "modelo": "reglas-deterministas-v2",
+    "casos": 22,
+    "corridas_sin_error": 22,
+    "exactitud_urgencia_pct": 100.0,
+    "deteccion_inconsistencias_pct": 100.0,
+    "latencia_mediana_s": 0.008,
+    "tokens_mediana": 1866,
+    "latencia_p90_s": 0.01,
+    "tokens_total": 38156,
+    "inconsistencias_esperadas": 5,
+    "inconsistencias_detectadas": 5,
+    "inconsistencias_falsos_positivos": 1,
+    "casos_borde": 7,
+    "casos_borde_ok": 7,
+    "herramientas_por_caso": 2.68,
+    "corridas_degradadas": 0
+  },
+  "casos": [
+    {
+      "id": "TC-001",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.02,
+      "tokens": 1872,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-002",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.009,
+      "tokens": 1432,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: rayon. Póliza activa con deducible de $ 800.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-003",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.022,
+      "tokens": 1880,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-004",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.026,
+      "tokens": 1898,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje HIGH: Validación humana en máximo 2 horas. Términos que determinan la urgencia: robaron. Póliza activa con deducible de $ 850.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-005",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "SEVERITY_CONTRADICTION"
+      ],
+      "inconsistencias_obtenidas": [
+        "SEVERITY_CONTRADICTION"
+      ],
+      "latencia_s": 0.01,
+      "tokens": 1922,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje HIGH: Revisión manual. Términos que determinan la urgencia: daño leve, PERDIDA TOTAL. Inconsistencia detectada: La descripción mezcla daños leves con destrucción grave. Póliza activa con deducible de $ 850.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-006",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.006,
+      "tokens": 1395,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Póliza activa con deducible de $ 750.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-007",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.01,
+      "tokens": 1876,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-008",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.01,
+      "tokens": 1860,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-009",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.009,
+      "tokens": 1892,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": true,
+      "resumen": "Triaje HIGH: Validación humana en máximo 2 horas. Términos que determinan la urgencia: fracturé, operar. Póliza activa con deducible de $ 250.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-010",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.006,
+      "tokens": 1404,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Póliza activa con deducible de $ 300.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-011",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.01,
+      "tokens": 1860,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-012",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.009,
+      "tokens": 1416,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Póliza activa con deducible de $ 300.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-013",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "inconsistencias_obtenidas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "latencia_s": 0.008,
+      "tokens": 1930,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje HIGH: Revisión manual. Términos que determinan la urgencia: destruido. Inconsistencia detectada: El tipo declarado no corresponde al relato. ATENCIÓN: la póliza está en estado LAPSED; la cobertura debe validarse con suscripción. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-014",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.008,
+      "tokens": 1868,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-015",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.008,
+      "tokens": 1856,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-016",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.005,
+      "tokens": 1411,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: gotera. Póliza activa con deducible de $ 1.100.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-017",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.008,
+      "tokens": 1876,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-018",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [
+        "DAMAGE_DENIED_BUT_SEVERE"
+      ],
+      "latencia_s": 0.007,
+      "tokens": 1889,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": true,
+      "resumen": "Triaje HIGH: Revisión manual. Términos que determinan la urgencia: quemó. Inconsistencia detectada: Niega daños pero describe daños graves. Póliza activa con deducible de $ 1.200.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-019",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "inconsistencias_obtenidas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "latencia_s": 0.005,
+      "tokens": 1431,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Inconsistencia detectada: El tipo declarado no corresponde al relato. ATENCIÓN: la póliza está en estado CANCELLED; la cobertura debe validarse con suscripción. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-020",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.007,
+      "tokens": 1864,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-021",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "DAMAGE_DENIED_BUT_SEVERE",
+        "INJURY_DENIED_BUT_EVIDENCE"
+      ],
+      "inconsistencias_obtenidas": [
+        "DAMAGE_DENIED_BUT_SEVERE",
+        "INJURY_DENIED_BUT_EVIDENCE"
+      ],
+      "latencia_s": 0.007,
+      "tokens": 1892,
+      "iteraciones": 4,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza",
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-022",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 0.005,
+      "tokens": 1432,
+      "iteraciones": 3,
+      "herramientas": [
+        "clasificar_urgencia",
+        "consultar_poliza"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": true,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: abolladura. ATENCIÓN: no existe póliza para el cliente reportado; verificar identificación antes de continuar. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    }
+  ]
+}

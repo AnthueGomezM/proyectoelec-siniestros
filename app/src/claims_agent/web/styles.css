@@ -1,0 +1,354 @@
+/* =============================================================================
+   Guardia de triaje — hoja de estilo única, sin framework ni build.
+
+   Dirección visual: el expediente físico y la sala de triaje. Dos materiales:
+   papel de archivo (fondo frío #F2F4F3, filetes finos, esquinas rectas) e
+   instrumento clínico (barra superior en petróleo, cifras en monoespaciada).
+   El elemento memorable es la TIRA DE REGISTRO: una cinta perforada donde cada
+   paso del agente se imprime en orden, como la cinta de un electrocardiógrafo.
+   Todo lo demás se mantiene callado para que esa cinta destaque.
+
+   Los colores de urgencia son los del triaje hospitalario (rojo / ámbar / verde)
+   y nunca se usan como decoración: solo marcan nivel. El color nunca va solo,
+   siempre lleva su palabra al lado.
+   ============================================================================= */
+
+:root {
+  --papel: #F2F4F3;
+  --papel-hondo: #E6EAE8;
+  --superficie: #FFFFFF;
+  --tinta: #1B2A2E;
+  --tinta-suave: #4A5C60;
+  --filete: #CBD4D2;
+  --instrumento: #0E6B72;
+
+  --critico: #B3261E;
+  --critico-fondo: #FBEDEC;
+  --alto: #9A5B00;
+  --alto-fondo: #FBF2E4;
+  --leve: #1F6B4A;
+  --leve-fondo: #EAF3EE;
+
+  --tipo: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--papel);
+  color: var(--tinta);
+  font: 400 15px/1.5 var(--tipo);
+  /* Fondo de papel pautado: líneas finísimas, perceptibles solo de cerca. */
+  background-image: repeating-linear-gradient(180deg, transparent 0 31px, rgba(27,42,46,.035) 31px 32px);
+}
+
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; }
+[hidden] { display: none !important; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--instrumento);
+  outline-offset: 2px;
+}
+
+/* ---------- barra de instrumentos ---------- */
+.guardia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: var(--tinta);
+  color: #DCE4E3;
+  border-bottom: 3px solid var(--instrumento);
+}
+
+.guardia-identidad { display: flex; align-items: center; gap: 14px; }
+.marca { width: 34px; height: 34px; flex: none; }
+.guardia h1 { font-size: 19px; color: #FFFFFF; }
+.guardia p { font-size: 13px; color: #9FB2B3; }
+
+.instrumentos { display: flex; flex-wrap: wrap; gap: 0; margin: 0; }
+.instrumentos > div { padding: 0 16px; border-left: 1px solid #2E4247; }
+.instrumentos > div:first-child { border-left: 0; }
+.instrumentos dt { font-size: 11px; color: #88A0A2; }
+.instrumentos dd { margin: 2px 0 0; font: 600 14px/1.2 var(--mono); color: #FFFFFF; }
+
+/* ---------- aviso de modo degradado ---------- */
+.aviso-degradado {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 28px;
+  background: #FFF8E8;
+  border-bottom: 1px solid #E0C98A;
+}
+.aviso-degradado p { font-size: 14px; }
+.aviso-degradado .hatch {
+  width: 46px; height: 18px; flex: none;
+  background: repeating-linear-gradient(135deg, #9A5B00 0 5px, transparent 5px 10px);
+}
+.aviso-degradado .cerrar {
+  margin-left: auto; border: 0; background: none; cursor: pointer; color: var(--alto); font-size: 15px;
+}
+
+/* ---------- maqueta ---------- */
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.cola { padding: 24px 24px 40px 28px; }
+.expediente {
+  padding: 24px 28px 40px 24px;
+  border-left: 1px solid var(--filete);
+  background: linear-gradient(90deg, rgba(27,42,46,.03) 0 10px, transparent 10px);
+  /* Queda fijo mientras se recorre la cola: la tira de registro no se pierde de vista. */
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.cola-encabezado, .expediente-encabezado {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+}
+.cola-encabezado h2, .expediente-encabezado h2 { font-size: 15px; color: var(--tinta-suave); }
+.cola-encabezado h2::after, .expediente-encabezado h2::after {
+  content: ""; display: block; height: 2px; background: var(--tinta); margin-top: 4px;
+}
+
+/* ---------- filtros ---------- */
+.filtros { display: flex; }
+.filtros button {
+  border: 1px solid var(--filete); border-right: 0; background: var(--superficie);
+  padding: 5px 11px; font-size: 13px; cursor: pointer;
+}
+.filtros button:last-child { border-right: 1px solid var(--filete); }
+.filtros button[aria-pressed="true"] { background: var(--tinta); color: #FFFFFF; border-color: var(--tinta); }
+.boton-fantasma {
+  margin-left: auto; border: 1px solid var(--filete); background: var(--superficie);
+  padding: 5px 12px; font-size: 13px; cursor: pointer;
+}
+.boton-fantasma:hover { border-color: var(--tinta-suave); }
+
+/* ---------- fichas de la cola ---------- */
+.fichas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.ficha {
+  position: relative;
+  display: grid;
+  grid-template-columns: 6px 1fr auto;
+  gap: 0 14px;
+  background: var(--superficie);
+  border: 1px solid var(--filete);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+}
+.ficha:hover { border-color: var(--tinta-suave); }
+.ficha[aria-current="true"] { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+
+.ficha .lomo { grid-row: 1 / -1; background: var(--filete); }
+.ficha.c-CRITICAL .lomo { background: var(--critico); }
+.ficha.c-HIGH .lomo { background: var(--alto); }
+.ficha.c-LOW .lomo { background: var(--leve); }
+
+.ficha-cuerpo { padding: 12px 0 12px 0; min-width: 0; }
+.ficha-cabecera { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ficha-cliente { font-weight: 600; }
+.ficha-tipo { font-size: 13px; color: var(--tinta-suave); }
+.ficha-relato {
+  margin-top: 4px; font-size: 14px; color: var(--tinta-suave);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ficha-pie { margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12.5px; }
+.ficha-lateral { padding: 12px 14px 12px 0; text-align: right; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+
+.etiqueta-urgencia {
+  display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid currentColor;
+}
+.u-CRITICAL { color: var(--critico); background: var(--critico-fondo); }
+.u-HIGH { color: var(--alto); background: var(--alto-fondo); }
+.u-LOW { color: var(--leve); background: var(--leve-fondo); }
+.u-NONE { color: var(--tinta-suave); background: var(--papel-hondo); }
+
+.marca-estado { font-size: 12px; color: var(--tinta-suave); }
+.marca-inconsistencia { color: var(--alto); font-weight: 600; }
+
+/* reloj de SLA: cuenta regresiva real sobre el contacto comprometido */
+.reloj { text-align: right; font-family: var(--mono); line-height: 1.1; }
+.reloj b { display: block; font-size: 19px; font-weight: 600; }
+.reloj em { font-style: normal; font-size: 11px; color: var(--tinta-suave); }
+.reloj.vencido b { color: var(--critico); }
+.reloj.apretado b { color: var(--alto); }
+
+/* ---------- formulario de reporte ---------- */
+.reportar { margin-top: 28px; border-top: 1px solid var(--filete); padding-top: 18px; }
+.reportar h2 { font-size: 15px; color: var(--tinta-suave); margin-bottom: 12px; }
+.campos { display: grid; grid-template-columns: 1fr 160px; gap: 12px; }
+label { display: block; font-size: 13px; color: var(--tinta-suave); }
+label.ancho { margin-top: 12px; }
+input, select, textarea {
+  width: 100%; margin-top: 4px; padding: 8px 10px;
+  border: 1px solid var(--filete); background: var(--superficie); border-radius: 0;
+}
+textarea { resize: vertical; font-size: 14.5px; line-height: 1.45; }
+input:hover, textarea:hover, select:hover { border-color: var(--tinta-suave); }
+
+.ejemplos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--tinta-suave); }
+.ejemplos button {
+  border: 1px dashed var(--filete); background: none; padding: 3px 9px; font-size: 12.5px; cursor: pointer;
+}
+.ejemplos button:hover { border-style: solid; border-color: var(--instrumento); color: var(--instrumento); }
+
+.boton-principal {
+  margin-top: 14px; border: 0; background: var(--instrumento); color: #FFFFFF;
+  padding: 10px 18px; font-weight: 600; cursor: pointer;
+}
+.boton-principal:hover { background: #0A565C; }
+.boton-principal:disabled { background: var(--tinta-suave); cursor: progress; }
+
+.error-formulario {
+  margin-top: 10px; padding: 9px 12px; font-size: 13.5px;
+  color: var(--critico); background: var(--critico-fondo); border-left: 3px solid var(--critico);
+}
+.error-formulario ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* ---------- expediente ---------- */
+.estado-corrida { margin-left: auto; font: 600 12px var(--mono); padding: 3px 9px; border: 1px solid var(--filete); }
+.sin-seleccion { color: var(--tinta-suave); font-size: 14.5px; padding: 28px 0; max-width: 46ch; }
+
+.detalle-cabecera { display: flex; gap: 14px; align-items: flex-start; }
+.detalle-cabecera h3 { font-size: 20px; }
+.detalle-cabecera p { font-size: 13px; color: var(--tinta-suave); margin-top: 2px; }
+.detalle-cabecera .reloj { margin-left: auto; }
+
+.relato {
+  margin: 14px 0 0; padding: 12px 16px; background: var(--superficie);
+  border-left: 3px solid var(--filete); font-size: 15px; line-height: 1.55;
+}
+
+.resumen-agente { margin-top: 16px; }
+.resumen-agente h4, .confirmacion h4, .decision h4, .tira h4 {
+  font-size: 13px; color: var(--tinta-suave); font-weight: 600; margin-bottom: 6px;
+}
+.resumen-agente p { font-size: 15px; line-height: 1.55; max-width: 72ch; }
+
+/* ---------- confirmación humana ---------- */
+.confirmacion {
+  margin-top: 18px; padding: 14px 16px; background: var(--superficie);
+  border: 1px solid var(--alto); border-left-width: 4px;
+}
+.confirmacion p { font-size: 14.5px; line-height: 1.5; }
+.confirmacion-acciones { display: flex; gap: 10px; margin-top: 12px; }
+.confirmacion .nota { margin-top: 10px; font-size: 12.5px; color: var(--tinta-suave); }
+
+.decision { margin-top: 18px; }
+.decision-acciones { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.boton-aprobacion { border: 0; background: var(--leve); color: #FFFFFF; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.boton-rechazo { border: 0; background: var(--critico); color: #FFFFFF; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+
+/* ---------- LA TIRA DE REGISTRO (elemento distintivo) ---------- */
+.tira { margin-top: 24px; }
+.tira-encabezado { display: flex; align-items: baseline; gap: 12px; }
+.totales { margin-left: auto; font: 400 12px var(--mono); color: var(--tinta-suave); }
+
+.pasos {
+  list-style: none; margin: 8px 0 0; padding: 10px 0 10px 0;
+  background: var(--superficie);
+  border: 1px solid var(--filete);
+  /* perforación de cinta en el borde izquierdo */
+  background-image: radial-gradient(circle at 11px 50%, var(--papel) 3px, transparent 3.5px);
+  background-size: 100% 22px;
+  background-repeat: repeat-y;
+}
+
+.paso {
+  display: grid;
+  grid-template-columns: 30px 18px 1fr auto;
+  gap: 0 10px;
+  padding: 7px 14px 7px 0;
+  border-bottom: 1px dotted var(--filete);
+  align-items: baseline;
+}
+.paso:last-child { border-bottom: 0; }
+.paso .t { font: 400 11.5px var(--mono); color: var(--tinta-suave); text-align: right; }
+.paso .glifo { font: 600 13px var(--mono); text-align: center; }
+.paso .cuerpo { min-width: 0; }
+.paso .titulo { font-size: 14px; font-weight: 500; }
+.paso .sub { font-size: 12.5px; color: var(--tinta-suave); margin-top: 2px; word-break: break-word; }
+.paso .cifras { font: 400 11.5px/1.5 var(--mono); color: var(--tinta-suave); text-align: right; white-space: nowrap; }
+
+.paso-llm_call .glifo { color: var(--instrumento); }
+.paso-tool_call .glifo { color: var(--tinta); }
+.paso-confirmation { background: var(--alto-fondo); }
+.paso-confirmation .glifo { color: var(--alto); }
+.paso-error { background: var(--critico-fondo); }
+.paso-error .glifo { color: var(--critico); }
+.paso-limit { background: var(--papel-hondo); }
+.paso-fallback { background: #FFF8E8; }
+.paso-final .titulo { font-weight: 600; }
+.paso-final .glifo { color: var(--leve); }
+
+.paso-entra { animation: imprimir .14s ease-out; }
+@keyframes imprimir { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+.imprimiendo { margin-top: 8px; font: 400 12.5px var(--mono); color: var(--tinta-suave); }
+.cursor {
+  display: inline-block; width: 7px; height: 13px; margin-left: 5px;
+  background: var(--instrumento); vertical-align: -2px; animation: latir 1s steps(2) infinite;
+}
+@keyframes latir { 50% { opacity: 0; } }
+
+.detalle-json {
+  margin-top: 4px; font: 400 11.5px/1.45 var(--mono); color: var(--tinta-suave);
+  background: var(--papel); padding: 6px 8px; border-left: 2px solid var(--filete);
+  max-height: 150px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+}
+
+/* ---------- avisos ---------- */
+.brindis {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--tinta); color: #FFFFFF; padding: 10px 18px; font-size: 14px; z-index: 20;
+}
+
+/* ---------- adaptable ---------- */
+@media (max-width: 980px) {
+  main { grid-template-columns: 1fr; }
+  .expediente {
+    border-left: 0; border-top: 1px solid var(--filete); background: none;
+    position: static; max-height: none; overflow: visible;
+  }
+  .campos { grid-template-columns: 1fr; }
+  .cola-encabezado { flex-wrap: wrap; }
+  .boton-fantasma { margin-left: 0; }
+  .paso { grid-template-columns: 26px 14px 1fr; }
+  .paso .cifras { grid-column: 1 / -1; text-align: left; padding-left: 40px; white-space: normal; }
+  .instrumentos > div { padding: 0 10px 0 0; border-left: 0; }
+  .cola { padding: 20px 16px 24px; }
+  .expediente { padding: 20px 16px 40px; }
+  .guardia { padding: 12px 16px; }
+  .instrumentos { width: 100%; }
+  .instrumentos > div:first-child { padding-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paso-entra { animation: none; }
+  .cursor { animation: none; }
+}

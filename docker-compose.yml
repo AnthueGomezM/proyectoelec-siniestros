@@ -1,0 +1,58 @@
+# =============================================================================
+# Todo el sistema en dos contenedores. Arranque:
+#
+#     cp .env.example .env     # y pon tu GEMINI_API_KEY
+#     ./run.sh                 # equivale a: docker compose up --build
+#
+# El esquema y los datos de ejemplo se cargan solos la primera vez (db/*.sql se
+# montan en /docker-entrypoint-initdb.d). No hay migraciones manuales.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: claims-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-claims}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-claims_local_pwd}
+      POSTGRES_DB: ${POSTGRES_DB:-claims}
+      # Acelera el arranque inicial; es una base de desarrollo, no de producción.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      # Migración + semilla automáticas en el primer arranque, en orden alfabético.
+      - ./db:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Expuesto para poder correr eval/ y psql desde la máquina anfitriona.
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-claims} -d ${POSTGRES_DB:-claims}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: claims-app
+    env_file:
+      - .env
+    environment:
+      # Se arma aquí para que .env solo tenga que declarar usuario y contraseña una vez.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-claims}:${POSTGRES_PASSWORD:-claims_local_pwd}@db:5432/${POSTGRES_DB:-claims}
+    volumes:
+      # La suite de evaluación se monta (no se copia) para poder editar casos y
+      # volver a medir sin reconstruir la imagen.
+      - ./eval:/app/eval
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
