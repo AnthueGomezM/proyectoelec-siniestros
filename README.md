@@ -28,7 +28,7 @@ No hace falta instalar Python, Node ni PostgreSQL: todo corre en contenedores.
 
 ```bash
 # 1. Descomprime el ZIP y entra a la carpeta
-cd claims-triage
+cd proyectoelec-siniestros
 
 # 2. Crea tu archivo de variables y pon la clave de Gemini
 cp .env.example .env
