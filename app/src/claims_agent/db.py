@@ -75,8 +75,9 @@ class Database:
                 """
                 SELECT c.*, a.urgency_level, a.urgency_score, a.keywords, a.inconsistencies,
                        a.inconsistencies_flag, a.recommended_action, a.sla_minutes,
-                       a.assigned_adjuster, a.agent_summary, a.provider, a.model,
-                       a.run_id, a.assessed_at
+                       a.assigned_adjuster, a.agent_summary, a.image_assessment, a.provider,
+                       a.model, a.run_id, a.assessed_at,
+                       EXISTS(SELECT 1 FROM claim_attachments t WHERE t.claim_id = c.id) AS has_image
                 FROM claims c
                 LEFT JOIN claim_assessments a ON a.claim_id = c.id
                 WHERE c.id = %s
@@ -108,7 +109,8 @@ class Database:
                 SELECT c.id, c.customer_id, c.claim_type, c.description, c.status,
                        c.incident_timestamp, c.received_at, c.estimated_cost,
                        a.urgency_level, a.urgency_score, a.inconsistencies_flag,
-                       a.recommended_action, a.assigned_adjuster, a.run_id
+                       a.recommended_action, a.assigned_adjuster, a.run_id,
+                       EXISTS(SELECT 1 FROM claim_attachments t WHERE t.claim_id = c.id) AS has_image
                 FROM claims c
                 LEFT JOIN claim_assessments a ON a.claim_id = c.id
                 {clause}
@@ -202,14 +204,16 @@ class Database:
     async def save_assessment(self, *, claim_id: UUID, urgency: str, score: float,
                               keywords: list[dict[str, Any]], inconsistencies: list[dict[str, Any]],
                               action: str, sla_minutes: int | None, summary: str | None,
-                              provider: str, model: str, run_id: UUID | None) -> None:
+                              provider: str, model: str, run_id: UUID | None,
+                              image_assessment: dict[str, Any] | None = None) -> None:
         async with self._pool.connection() as conn:
             await conn.execute(
                 """
                 INSERT INTO claim_assessments (claim_id, urgency_level, urgency_score, keywords,
                                                inconsistencies, inconsistencies_flag, recommended_action,
-                                               sla_minutes, agent_summary, provider, model, run_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                               sla_minutes, agent_summary, image_assessment, provider,
+                                               model, run_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (claim_id) DO UPDATE SET
                     urgency_level = EXCLUDED.urgency_level,
                     urgency_score = EXCLUDED.urgency_score,
@@ -219,14 +223,39 @@ class Database:
                     recommended_action = EXCLUDED.recommended_action,
                     sla_minutes = EXCLUDED.sla_minutes,
                     agent_summary = EXCLUDED.agent_summary,
+                    image_assessment = EXCLUDED.image_assessment,
                     provider = EXCLUDED.provider,
                     model = EXCLUDED.model,
                     run_id = EXCLUDED.run_id,
                     assessed_at = now()
                 """,
                 (claim_id, urgency, score, Jsonb(keywords), Jsonb(inconsistencies),
-                 bool(inconsistencies), action, sla_minutes, summary, provider, model, run_id),
+                 bool(inconsistencies), action, sla_minutes, summary,
+                 Jsonb(image_assessment) if image_assessment is not None else None,
+                 provider, model, run_id),
             )
+
+    # ------------------------------------------------------------------ imágenes adjuntas
+
+    async def create_attachment(self, claim_id: UUID, *, file_path: str, mime_type: str,
+                                size_bytes: int) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                """
+                INSERT INTO claim_attachments (claim_id, file_path, mime_type, size_bytes)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (claim_id, file_path, mime_type, size_bytes),
+            )
+
+    async def get_attachment(self, claim_id: UUID) -> dict[str, Any] | None:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "SELECT claim_id, file_path, mime_type, size_bytes FROM claim_attachments WHERE claim_id = %s",
+                (claim_id,),
+            )
+            row = await cur.fetchone()
+        return dict(row) if row else None
 
     async def assign_adjuster(self, claim_id: UUID, adjuster: str, motivo: str) -> bool:
         async with self._pool.connection() as conn:

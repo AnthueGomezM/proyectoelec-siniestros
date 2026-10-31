@@ -68,6 +68,9 @@ class Settings:
     agent_require_confirmation: bool = True
     # --- degradación ---
     allow_offline_fallback: bool = True
+    # --- imágenes adjuntas ---
+    uploads_dir: str = "/data/uploads"
+    max_image_mb: int = 8
     # --- servidor ---
     app_port: int = 8000
     log_level: str = "INFO"
@@ -110,6 +113,8 @@ class Settings:
             agent_max_tokens=_int(env, "AGENT_MAX_TOKENS", 8000, minimum=256),
             agent_require_confirmation=_bool(env, "AGENT_REQUIRE_CONFIRMATION", True),
             allow_offline_fallback=_bool(env, "ALLOW_OFFLINE_FALLBACK", True),
+            uploads_dir=(env.get("UPLOADS_DIR") or "/data/uploads").strip(),
+            max_image_mb=_int(env, "MAX_IMAGE_MB", 8, minimum=1),
             app_port=_int(env, "APP_PORT", 8000),
             log_level=(env.get("LOG_LEVEL") or "INFO").strip().upper(),
         )

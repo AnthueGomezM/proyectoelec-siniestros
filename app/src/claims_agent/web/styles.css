@@ -211,6 +211,12 @@ input, select, textarea {
 textarea { resize: vertical; font-size: 14.5px; line-height: 1.45; }
 input:hover, textarea:hover, select:hover { border-color: var(--tinta-suave); }
 
+input[type="file"] { padding: 6px 8px; cursor: pointer; }
+.previsualizacion {
+  margin-top: 10px; max-width: 220px; max-height: 160px; display: block;
+  border: 1px solid var(--filete); object-fit: cover;
+}
+
 .ejemplos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--tinta-suave); }
 .ejemplos button {
   border: 1px dashed var(--filete); background: none; padding: 3px 9px; font-size: 12.5px; cursor: pointer;
@@ -243,6 +249,14 @@ input:hover, textarea:hover, select:hover { border-color: var(--tinta-suave); }
   margin: 14px 0 0; padding: 12px 16px; background: var(--superficie);
   border-left: 3px solid var(--filete); font-size: 15px; line-height: 1.55;
 }
+
+.imagen-adjunta { margin-top: 16px; }
+.imagen-adjunta h4 { font-size: 13px; color: var(--tinta-suave); font-weight: 600; margin-bottom: 6px; }
+.imagen-adjunta img {
+  max-width: 320px; max-height: 220px; display: block; border: 1px solid var(--filete);
+  object-fit: cover;
+}
+.imagen-adjunta .sub { margin-top: 6px; font-size: 13px; color: var(--tinta-suave); max-width: 60ch; }
 
 .resumen-agente { margin-top: 16px; }
 .resumen-agente h4, .confirmacion h4, .decision h4, .tira h4 {

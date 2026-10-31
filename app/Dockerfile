@@ -21,7 +21,11 @@ ENV PYTHONUNBUFFERED=1 \
     APP_PORT=8000
 
 # Usuario sin privilegios: el contenedor no corre como root.
-RUN useradd --system --uid 10001 --create-home appuser && chown -R appuser /app
+# /data/uploads se crea aquí (con el dueño correcto) porque Docker copia los
+# permisos del directorio de la imagen al volumen nombrado la primera vez que se monta.
+RUN mkdir -p /data/uploads \
+    && useradd --system --uid 10001 --create-home appuser \
+    && chown -R appuser /app /data
 USER 10001
 
 EXPOSE 8000

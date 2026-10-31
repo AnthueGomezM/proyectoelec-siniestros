@@ -47,6 +47,8 @@ services:
       # La suite de evaluación se monta (no se copia) para poder editar casos y
       # volver a medir sin reconstruir la imagen.
       - ./eval:/app/eval
+      # Fotos adjuntas a los reportes: persisten aunque se recree el contenedor.
+      - uploads:/data/uploads
     ports:
       - "${APP_PORT:-8000}:8000"
     depends_on:
@@ -56,3 +58,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

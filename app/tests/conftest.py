@@ -39,6 +39,7 @@ class FakeDB:
         self._policy = policy
         self._similares = similares or []
         self.fallar_en: str | None = None
+        self._attachment: dict[str, Any] | None = None
 
     async def create_run(self, claim_id, provider, model):  # type: ignore[no-untyped-def]
         run_id = uuid.uuid4()
@@ -88,6 +89,13 @@ class FakeDB:
 
     async def save_assessment(self, **kwargs):  # type: ignore[no-untyped-def]
         self.assessments.append(kwargs)
+
+    async def create_attachment(self, claim_id, *, file_path, mime_type, size_bytes):  # type: ignore[no-untyped-def]
+        self._attachment = {"claim_id": claim_id, "file_path": file_path,
+                            "mime_type": mime_type, "size_bytes": size_bytes}
+
+    async def get_attachment(self, claim_id):  # type: ignore[no-untyped-def]
+        return self._attachment
 
 
 class ScriptedProvider(LLMProvider):

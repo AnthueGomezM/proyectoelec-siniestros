@@ -13,15 +13,18 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from claims_agent.agent.loop import STATUS_AWAITING, TriageAgent
 from claims_agent.api.errors import problem
+from claims_agent.storage import ImageRejected, save_image
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -139,12 +142,46 @@ async def config(request: Request) -> dict[str, Any]:
 # ---------------------------------------------------------------------------- siniestros
 
 @router.post("/claims", status_code=202, tags=["siniestros"])
-async def crear_siniestro(payload: ClaimIn, request: Request) -> dict[str, Any]:
-    """Registra el siniestro y lanza el triaje en segundo plano.
+async def crear_siniestro(
+    request: Request,
+    customer_id: Annotated[str, Form()],
+    claim_type: Annotated[str, Form()],
+    description: Annotated[str, Form()],
+    incident_timestamp: Annotated[str, Form()],
+    gps_latitude: Annotated[float | None, Form()] = None,
+    gps_longitude: Annotated[float | None, Form()] = None,
+    imagen: Annotated[UploadFile | None, File()] = None,
+) -> dict[str, Any]:
+    """Registra el siniestro (con foto opcional) y lanza el triaje en segundo plano.
 
+    multipart/form-data en vez de JSON: es el único endpoint que recibe un archivo.
     Responde 202 de inmediato con el `run_id`: el dashboard se conecta al stream de
     trazas y ve el trabajo del agente mientras ocurre.
     """
+    gps = None
+    if gps_latitude is not None and gps_longitude is not None:
+        gps = {"latitude": gps_latitude, "longitude": gps_longitude}
+    try:
+        payload = ClaimIn.model_validate({
+            "customer_id": customer_id, "claim_type": claim_type, "description": description,
+            "incident_timestamp": incident_timestamp, "gps": gps,
+        })
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from None
+
+    settings = request.app.state.settings
+    ruta = mime = None
+    tamano = 0
+    if imagen is not None and imagen.filename:
+        datos = await imagen.read()
+        try:
+            ruta, mime, tamano = save_image(
+                Path(settings.uploads_dir), datos, imagen.content_type or "",
+                max_bytes=settings.max_image_mb * 1024 * 1024,
+            )
+        except ImageRejected as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+
     db = _db(request)
     agente = _agent(request)
     claim = await db.create_claim(
@@ -155,6 +192,11 @@ async def crear_siniestro(payload: ClaimIn, request: Request) -> dict[str, Any]:
         longitude=payload.gps.longitude if payload.gps else None,
         incident_timestamp=payload.incident_timestamp,
     )
+
+    if ruta is not None:
+        await db.create_attachment(claim["id"], file_path=ruta, mime_type=mime, size_bytes=tamano)
+    claim["tiene_imagen"] = ruta is not None
+
     run_id = await agente.start_run(claim)
 
     async def _correr() -> None:
@@ -205,6 +247,19 @@ async def detalle_siniestro(claim_id: UUID, request: Request) -> dict[str, Any]:
         "corrida": _fila(run) if run else None,
         "trazas": [_fila(p) for p in pasos],
     }
+
+
+@router.get("/claims/{claim_id}/image", tags=["siniestros"])
+async def imagen_siniestro(claim_id: UUID, request: Request) -> FileResponse:
+    """Devuelve la foto adjunta al reporte, si la hay (la misma que analizó el agente)."""
+    adjunto = await _db(request).get_attachment(claim_id)
+    if adjunto is None:
+        raise HTTPException(status_code=404, detail="Este siniestro no tiene imagen adjunta.")
+    settings = request.app.state.settings
+    ruta = Path(settings.uploads_dir) / adjunto["file_path"]
+    if not ruta.is_file():
+        raise HTTPException(status_code=404, detail="El archivo de la imagen no está disponible.")
+    return FileResponse(ruta, media_type=adjunto["mime_type"])
 
 
 @router.patch("/claims/{claim_id}/status", tags=["siniestros"])

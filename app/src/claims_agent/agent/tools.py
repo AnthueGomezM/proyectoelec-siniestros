@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from claims_agent.db import Database
 from claims_agent.nlp.classifier import UrgencyClassifier
 from claims_agent.providers.base import ToolSpec
+from claims_agent.providers.vision import ImageAnalyzer
+from claims_agent.storage import read_image
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +46,8 @@ class ToolContext:
     db: Database
     claim: dict[str, Any]
     classifier: UrgencyClassifier
+    uploads_dir: Path
+    image_analyzer: ImageAnalyzer
 
 
 @dataclass(frozen=True)
@@ -53,6 +58,10 @@ class Tool:
     handler: Callable[[ToolContext, dict[str, Any]], Awaitable[dict[str, Any]]]
     requires_confirmation: bool = False
     timeout_seconds: float = 8.0
+    #: Si es True, `timeout_seconds` es un piso: el bucle lo amplía hasta cubrir
+    #: LLM_TIMEOUT_SECONDS, porque el handler hace su propia llamada a un modelo
+    #: (no una consulta SQL rápida) y no puede cortarse antes que esa llamada termine.
+    uses_llm: bool = False
     notes: str = field(default="", compare=False)
 
     def spec(self) -> ToolSpec:
@@ -151,6 +160,22 @@ async def _consultar_poliza(ctx: ToolContext, args: dict[str, Any]) -> dict[str,
         "vigencia": f"{poliza['valid_from']} a {poliza['valid_to']}",
         "ciudad": poliza["city"],
     }
+
+
+async def _analizar_imagen(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+    claim_id = ctx.claim.get("id")
+    if not isinstance(claim_id, UUID):
+        return {"tiene_imagen": False, "mensaje": "No hay un siniestro asociado a esta corrida."}
+    adjunto = await ctx.db.get_attachment(claim_id)
+    if adjunto is None:
+        return {"tiene_imagen": False, "mensaje": "El cliente no adjuntó ninguna imagen con este reporte."}
+    datos = read_image(ctx.uploads_dir, adjunto["file_path"])
+    resultado = await ctx.image_analyzer.analyze(
+        image_bytes=datos, mime_type=adjunto["mime_type"],
+        claim_type=ctx.claim.get("claim_type", ""), description=ctx.claim.get("description", ""),
+    )
+    resultado["tiene_imagen"] = True
+    return resultado
 
 
 async def _buscar_similares(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
@@ -259,6 +284,25 @@ TOOLS: tuple[Tool, ...] = (
             "required": ["customer_id"],
         },
         handler=_consultar_poliza,
+    ),
+    Tool(
+        name="analizar_imagen_dano",
+        description=(
+            "Analiza con visión por computador la foto que el cliente adjuntó al reporte, si la "
+            "hay. Describe el daño visible, estima su severidad (LEVE, MODERADO, SEVERO o "
+            "INDETERMINADO) e indica si lo que se ve es consistente con el relato escrito. "
+            "Úsala SOLO si el campo 'tiene_imagen' del siniestro es verdadero; si no hay imagen "
+            "adjunta, no la llames ni la menciones en tu resumen. No reemplaza a "
+            "clasificar_urgencia ni cambia su nivel oficial: es información adicional para el "
+            "ajustador. Si el daño visible contradice claramente el relato (por severidad o por "
+            "tipo de daño), trátalo como una inconsistencia más en tu resumen."
+        ),
+        parameters={"type": "object", "properties": {}, "required": []},
+        handler=_analizar_imagen,
+        timeout_seconds=20.0,
+        uses_llm=True,
+        notes=("Llama a un modelo de visión (Gemini) en modo gemini; en modo offline devuelve "
+              "'revisión manual' sin red ni tokens."),
     ),
     Tool(
         name="buscar_siniestros_similares",

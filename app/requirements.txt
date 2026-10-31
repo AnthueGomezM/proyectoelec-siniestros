@@ -1,6 +1,7 @@
 # Dependencias de ejecución, con versión exacta: la misma imagen produce el mismo
 # comportamiento hoy y el día de la demo. Verificadas con Python 3.12.
 fastapi==0.161.1
+python-multipart==0.0.20
 uvicorn[standard]==0.54.0
 psycopg[binary]==3.3.6
 psycopg-pool==3.3.3

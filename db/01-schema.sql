@@ -3,12 +3,13 @@
 -- Motor: PostgreSQL 16. Se aplica automáticamente al crear el contenedor de BD
 -- (docker-entrypoint-initdb.d). Idempotente: usa IF NOT EXISTS.
 --
--- Cinco áreas:
+-- Seis áreas:
 --   1. policies              -> datos de póliza que consulta el agente (herramienta)
 --   2. claims                -> siniestros reportados
 --   3. claim_assessments     -> resultado del triaje (1:1 con claims)
 --   4. agent_runs/steps      -> TRAZAS del agente: una fila por paso, visible en la UI
 --   5. claim_status_history  -> auditoría de decisiones humanas
+--   6. claim_attachments     -> foto adjunta al reporte (archivo en disco, ruta aquí)
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS claim_assessments (
     sla_minutes           INTEGER,
     assigned_adjuster     VARCHAR(64),
     agent_summary         TEXT,
+    image_assessment      JSONB,        -- resultado de analizar_imagen_dano; NULL si no hay foto
     provider              VARCHAR(32)   NOT NULL,
     model                 VARCHAR(64)   NOT NULL,
     run_id                UUID,
@@ -145,3 +147,20 @@ CREATE TABLE IF NOT EXISTS claim_status_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_history_claim ON claim_status_history (claim_id, changed_at);
+
+-- -----------------------------------------------------------------------------
+-- 6. Foto adjunta al reporte. El archivo vive en un volumen Docker (ver
+--    storage.py); aquí solo queda la ruta relativa, el tipo MIME y el tamaño.
+--    Un siniestro tiene como máximo una imagen en esta primera versión.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS claim_attachments (
+    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    claim_id    UUID          NOT NULL REFERENCES claims (id) ON DELETE CASCADE,
+    file_path   VARCHAR(255)  NOT NULL,
+    mime_type   VARCHAR(32)   NOT NULL,
+    size_bytes  INTEGER       NOT NULL,
+    uploaded_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    CONSTRAINT ck_attachment_mime CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_attachments_claim ON claim_attachments (claim_id);

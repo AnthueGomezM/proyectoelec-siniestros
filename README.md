@@ -73,7 +73,7 @@ Si la clave está vencida o sin cuota, te enteras aquí y no frente al salón.
 | `./run.sh` | Levanta base de datos y aplicación, y espera a que respondan |
 | `./run.sh check` | Prueba la clave del proveedor de IA con una llamada real |
 | `./run.sh eval` | Corre los 22 casos dorados y escribe la línea base en `eval/resultados/` |
-| `./run.sh test` | Corre las 69 pruebas unitarias en un contenedor limpio |
+| `./run.sh test` | Corre las 85 pruebas unitarias en un contenedor limpio |
 | `./run.sh logs` | Sigue los logs de la aplicación |
 | `./run.sh down` | Apaga (conserva los datos) |
 | `./run.sh reset` | Apaga y borra la base para empezar de cero |
@@ -111,20 +111,22 @@ app/
     main.py                arranque de FastAPI
     config.py              variables de entorno y validación
     db.py                  acceso a PostgreSQL (SQL explícito, sin ORM)
+    storage.py             guarda y lee las fotos adjuntas en disco (no en la BD)
     agent/
       loop.py              bucle agéntico con los 4 límites
-      tools.py             las 4 herramientas y la validación de argumentos
+      tools.py             las 5 herramientas y la validación de argumentos
       prompts.py           instrucción de sistema (versionada)
     providers/
       base.py              interfaz: lo único que el agente conoce del proveedor
       gemini.py            Google Gemini por API REST
       offline.py           motor determinista: respaldo y pruebas sin red
+      vision.py            analizador de imágenes (Gemini visión + respaldo offline)
     nlp/
       lexicon.py           diccionario de urgencia con pesos (editable sin tocar código)
       classifier.py        clasificador determinista
     api/                   endpoints, SSE de trazas, manejo de errores
     web/                   dashboard (HTML, CSS y JS sin dependencias)
-  tests/                   69 pruebas unitarias
+  tests/                   85 pruebas unitarias
 eval/
   casos_dorados.jsonl      22 casos con la urgencia que esperaría un ajustador
   run_eval.py              corre la suite y calcula las medianas
@@ -140,15 +142,22 @@ docs/
 
 ## El agente
 
-**Cuatro herramientas propias** (`app/src/claims_agent/agent/tools.py`), con descripciones
+**Cinco herramientas propias** (`app/src/claims_agent/agent/tools.py`), con descripciones
 escritas como prompts e iteradas contra la suite de evaluación:
 
 | Herramienta | Qué hace | Determinista |
 |---|---|---|
 | `clasificar_urgencia` | Nivel, puntuación, palabras clave e inconsistencias | Sí, sin IA |
 | `consultar_poliza` | Estado, vigencia, cobertura y deducible | Sí, SQL |
+| `analizar_imagen_dano` | Daño visible, severidad y si coincide con el relato, a partir de la foto adjunta (opcional) | No, visión por modelo (Gemini); en offline devuelve "revisión manual" |
 | `buscar_siniestros_similares` | Casos resueltos parecidos con su costo real | Sí, texto completo |
 | `asignar_ajustador` | Asigna y pasa a *En revisión* | **Requiere aprobación humana** |
+
+El cliente puede adjuntar una foto del daño al reportar (`POST /api/claims` acepta
+`multipart/form-data`, un solo archivo JPEG/PNG/WEBP de hasta `MAX_IMAGE_MB`). La foto
+se guarda en un volumen Docker (`UPLOADS_DIR`), no en la base de datos; solo la ruta
+queda en `claim_attachments`. El agente la analiza con `analizar_imagen_dano` únicamente
+si el reporte trae imagen, y su resultado queda junto a la urgencia en el expediente.
 
 **Cuatro límites activos**, visibles en la barra superior del dashboard:
 

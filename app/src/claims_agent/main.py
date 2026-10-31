@@ -24,7 +24,7 @@ from claims_agent.config import ConfigError, Settings
 from claims_agent.db import Database
 from claims_agent.logging_setup import configure_logging
 from claims_agent.nlp.classifier import UrgencyClassifier
-from claims_agent.providers.factory import build_fallback, build_provider
+from claims_agent.providers.factory import build_fallback, build_image_analyzer, build_provider
 
 log = logging.getLogger("claims_agent")
 
@@ -41,9 +41,11 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     await db.open()
     provider = build_provider(settings)
     fallback = build_fallback(settings)
+    image_analyzer = build_image_analyzer(settings)
 
     app.state.db = db
-    app.state.agent = TriageAgent(settings, db, provider, fallback, UrgencyClassifier())
+    app.state.agent = TriageAgent(settings, db, provider, fallback, UrgencyClassifier(),
+                                  image_analyzer=image_analyzer, uploads_dir=Path(settings.uploads_dir))
     app.state.tasks = set()
 
     if not await db.ping():
@@ -59,6 +61,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         await provider.aclose()
         if fallback is not None:
             await fallback.aclose()
+        await image_analyzer.aclose()
         await db.close()
         log.info("claims-agent detenido")
 

@@ -77,8 +77,11 @@
   };
 
   async function pedir(url, opciones = {}) {
+    // FormData (reportar con imagen) necesita que el navegador ponga su propio
+    // Content-Type con el boundary del multipart; si lo fijamos nosotros, se rompe.
+    const esFormData = opciones.body instanceof FormData;
     const respuesta = await fetch(url, {
-      headers: { Accept: "application/json", ...(opciones.body ? { "Content-Type": "application/json" } : {}) },
+      headers: { Accept: "application/json", ...(opciones.body && !esFormData ? { "Content-Type": "application/json" } : {}) },
       ...opciones,
     });
     const tipo = respuesta.headers.get("Content-Type") || "";
@@ -244,6 +247,7 @@
     $("detMeta").textContent = meta.join(" — ");
     $("detRelato").textContent = claim.description;
 
+    pintarImagen(claim);
     $("resumenAgente").hidden = !claim.agent_summary;
     $("detResumen").textContent = claim.agent_summary || "";
 
@@ -259,6 +263,21 @@
       avisarDegradado("Este triaje corrió en modo determinista porque el modelo no respondió.");
     }
     if (corrida && corrida.status === "RUNNING") seguirEnVivo(corrida.id);
+  }
+
+  const SEVERIDAD_ES = { LEVE: "leve", MODERADO: "moderado", SEVERO: "severo", INDETERMINADO: "indeterminado" };
+
+  function pintarImagen(claim) {
+    const contenedor = $("imagenAdjunta");
+    if (!claim.has_image) { contenedor.hidden = true; return; }
+    $("imagenAdjuntaImg").src = `/api/claims/${claim.id}/image`;
+    const a = claim.image_assessment;
+    $("imagenAnalisis").textContent = a
+      ? `Severidad ${SEVERIDAD_ES[a.severidad] || a.severidad}` +
+        (a.coincide_con_relato === false ? " · no coincide con el relato" : "") +
+        (a.descripcion ? `: ${a.descripcion}` : "")
+      : "El agente todavía no analizó esta foto.";
+    contenedor.hidden = false;
   }
 
   const accionEs = (a) => ({
@@ -360,6 +379,10 @@
         return salida.encontrada
           ? `póliza ${salida.estado}, producto ${salida.producto}, deducible ${fmtPesos(salida.deducible)}`
           : "no existe póliza para ese cliente";
+      }
+      if (nombre === "analizar_imagen_dano") {
+        if (!salida.tiene_imagen) return salida.mensaje || "no hay imagen adjunta";
+        return `daño ${salida.severidad}` + (salida.coincide_con_relato === false ? " · no coincide con el relato" : "");
       }
       if (nombre === "buscar_siniestros_similares") {
         return `${salida.total || 0} caso(s) parecido(s) por texto completo`;
@@ -503,18 +526,16 @@
     const form = evento.target;
     const error = $("errorFormulario");
     error.hidden = true;
-    const datos = Object.fromEntries(new FormData(form).entries());
-    const cuerpo = {
-      customer_id: datos.customer_id,
-      claim_type: datos.claim_type,
-      description: datos.description,
-      incident_timestamp: new Date(Date.now() - 20 * 60000).toISOString(),
-    };
+    const formData = new FormData(form);
+    formData.set("incident_timestamp", new Date(Date.now() - 20 * 60000).toISOString());
+    const customerId = formData.get("customer_id");
+    const claimType = formData.get("claim_type");
+    const description = formData.get("description");
 
     $("enviar").disabled = true;
     $("enviar").textContent = "Enviando…";
     try {
-      const respuesta = await pedir("/api/claims", { method: "POST", body: JSON.stringify(cuerpo) });
+      const respuesta = await pedir("/api/claims", { method: "POST", body: formData });
       estado.seleccion = respuesta.claim_id;
       await cargarCola();
       $("sinSeleccion").hidden = true;
@@ -523,14 +544,17 @@
       $("tiraTotales").textContent = "";
       $("resumenAgente").hidden = true;
       $("confirmacion").hidden = true;
+      $("imagenAdjunta").hidden = true;
       $("detUrgencia").className = "etiqueta-urgencia u-NONE";
       $("detUrgencia").textContent = "clasificando";
-      $("detCliente").textContent = `${cuerpo.customer_id} · ${TIPO_ES[cuerpo.claim_type]}`;
+      $("detCliente").textContent = `${customerId} · ${TIPO_ES[claimType]}`;
       $("detMeta").textContent = "recién reportado";
-      $("detRelato").textContent = cuerpo.description;
+      $("detRelato").textContent = description;
       $("detReloj").hidden = true;
       seguirEnVivo(respuesta.run_id);
       brindis("Reporte recibido. El agente está trabajando.");
+      form.imagen.value = "";
+      $("previsualizacion").hidden = true;
     } catch (err) {
       mostrarError(error, err);
     } finally {
@@ -551,6 +575,13 @@
       cargarCola();
     });
     $("cerrarAviso").addEventListener("click", () => { $("avisoDegradado").hidden = true; });
+    $("imagenInput").addEventListener("change", () => {
+      const archivo = $("imagenInput").files[0];
+      const previsualizacion = $("previsualizacion");
+      if (!archivo) { previsualizacion.hidden = true; return; }
+      previsualizacion.src = URL.createObjectURL(archivo);
+      previsualizacion.hidden = false;
+    });
     $("aprobar").addEventListener("click", () => confirmar(true));
     $("rechazar").addEventListener("click", () => confirmar(false));
 

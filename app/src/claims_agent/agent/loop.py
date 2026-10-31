@@ -29,6 +29,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -51,6 +52,7 @@ from claims_agent.providers.base import (
     ProviderError,
     ToolCall,
 )
+from claims_agent.providers.vision import ImageAnalyzer, OfflineImageAnalyzer
 
 log = logging.getLogger(__name__)
 
@@ -100,12 +102,16 @@ class TriageAgent:
 
     def __init__(self, settings: Settings, db: Database, provider: LLMProvider,
                  fallback: LLMProvider | None = None,
-                 classifier: UrgencyClassifier | None = None) -> None:
+                 classifier: UrgencyClassifier | None = None,
+                 image_analyzer: ImageAnalyzer | None = None,
+                 uploads_dir: Path | None = None) -> None:
         self.settings = settings
         self.db = db
         self.provider = provider
         self.fallback = fallback
         self.classifier = classifier or UrgencyClassifier()
+        self.image_analyzer = image_analyzer or OfflineImageAnalyzer()
+        self.uploads_dir = uploads_dir or Path(settings.uploads_dir)
 
     # ------------------------------------------------------------------ API pública
 
@@ -132,6 +138,8 @@ class TriageAgent:
             raise ValueError(f"La corrida no está esperando confirmación (estado {run['status']})")
 
         claim = await self.db.get_claim(run["claim_id"]) if run["claim_id"] else {}
+        if claim:
+            claim["tiene_imagen"] = claim.get("has_image", False)
         steps = await self.db.get_steps(run_id)
         pendiente = next((s for s in reversed(steps) if s["kind"] == "confirmation"), None)
         if pendiente is None:
@@ -140,7 +148,8 @@ class TriageAgent:
         messages = _messages_from_steps(claim or {}, steps)
         idx = max(s["idx"] for s in steps) + 1
         provider = self.fallback if (run["degraded"] and self.fallback) else self.provider
-        ctx = ToolContext(db=self.db, claim=claim or {}, classifier=self.classifier)
+        ctx = ToolContext(db=self.db, claim=claim or {}, classifier=self.classifier,
+                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer)
         tool = TOOLS_BY_NAME[pendiente["name"]]
         args = pendiente["input"] or {}
 
@@ -170,7 +179,8 @@ class TriageAgent:
                     start_idx: int, iterations: int, tokens_in: int, tokens_out: int,
                     provider: LLMProvider, degraded: bool, started: float) -> AgentResult:
         s = self.settings
-        ctx = ToolContext(db=self.db, claim=claim, classifier=self.classifier)
+        ctx = ToolContext(db=self.db, claim=claim, classifier=self.classifier,
+                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer)
         specs = tool_specs()
         idx = start_idx
         deadline = started + s.agent_timeout_seconds
@@ -314,10 +324,12 @@ class TriageAgent:
                                  provider=provider.name, model=provider.model)
 
         assessment = _assessment_from_messages(messages)
+        image_assessment = _image_assessment_from_messages(messages)
         if claim.get("id") is not None:
             assessment = await self._persist_assessment(
                 run_id=run_id, claim=claim, assessment=assessment, summary=summary,
-                provider=provider, degraded=degraded, status=status)
+                provider=provider, degraded=degraded, status=status,
+                image_assessment=image_assessment)
 
         steps = await self.db.get_steps(run_id, after_idx=start_idx - 1)
         return AgentResult(
@@ -339,10 +351,11 @@ class TriageAgent:
             # Error del modelo, no del sistema: se le devuelve para que se corrija.
             return ({"error": str(exc), "reintentable": True}, int((time.perf_counter() - t0) * 1000))
 
+        limite = _effective_timeout(tool, self.settings)
         try:
-            resultado = await asyncio.wait_for(tool.handler(ctx, limpios), timeout=tool.timeout_seconds)
+            resultado = await asyncio.wait_for(tool.handler(ctx, limpios), timeout=limite)
         except asyncio.TimeoutError:
-            resultado = {"error": f"La herramienta '{tool.name}' superó {tool.timeout_seconds:.0f}s "
+            resultado = {"error": f"La herramienta '{tool.name}' superó {limite:.0f}s "
                                   f"y se canceló.", "reintentable": False}
         except ToolExecutionError as exc:
             resultado = {"error": str(exc), "reintentable": False}
@@ -355,7 +368,8 @@ class TriageAgent:
     async def _persist_assessment(self, *, run_id: UUID, claim: dict[str, Any],
                                   assessment: dict[str, Any] | None, summary: str | None,
                                   provider: LLMProvider, degraded: bool,
-                                  status: str) -> dict[str, Any]:
+                                  status: str,
+                                  image_assessment: dict[str, Any] | None = None) -> dict[str, Any]:
         """Guarda la evaluación. Red de seguridad: si el agente no clasificó, clasifica el código.
 
         Un siniestro nunca puede quedar sin nivel de urgencia porque el modelo se
@@ -382,11 +396,25 @@ class TriageAgent:
             provider=provider.name + ("+red_de_seguridad" if red_de_seguridad else ""),
             model=provider.model,
             run_id=run_id,
+            image_assessment=image_assessment,
         )
         return assessment
 
 
 # ---------------------------------------------------------------------------- utilidades
+
+def _effective_timeout(tool: Tool, settings: Settings) -> float:
+    """El timeout real con el que se ejecuta una herramienta.
+
+    `tool.timeout_seconds` es un piso fijo, salvo para herramientas que llaman a un
+    modelo (`uses_llm`): esas no pueden cortarse antes de que termine su propia llamada,
+    así que su timeout nunca baja de LLM_TIMEOUT_SECONDS + un margen para el resto del
+    trabajo del handler (leer el archivo, normalizar la respuesta, etc.).
+    """
+    if tool.uses_llm:
+        return max(tool.timeout_seconds, settings.llm_timeout_seconds + 5)
+    return tool.timeout_seconds
+
 
 def _describe_action(tool: Tool, arguments: dict[str, Any]) -> str:
     if tool.name == "asignar_ajustador":
@@ -401,6 +429,16 @@ def _assessment_from_messages(messages: list[Msg]) -> dict[str, Any] | None:
         if msg.role == "tool" and msg.tool_name == "clasificar_urgencia":
             resultado = msg.tool_result or {}
             if "urgencia" in resultado:
+                return resultado
+    return None
+
+
+def _image_assessment_from_messages(messages: list[Msg]) -> dict[str, Any] | None:
+    """Recupera el resultado de analizar_imagen_dano, si el agente llegó a llamarla."""
+    for msg in reversed(messages):
+        if msg.role == "tool" and msg.tool_name == "analizar_imagen_dano":
+            resultado = msg.tool_result or {}
+            if resultado.get("tiene_imagen"):
                 return resultado
     return None
 

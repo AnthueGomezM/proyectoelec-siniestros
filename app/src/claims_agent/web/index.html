@@ -80,6 +80,10 @@
           <textarea name="description" rows="3" required minlength="10" maxlength="5000"
             placeholder="Transcribe lo que dijo el cliente, sin corregir ni resumir.">Choque en la autopista norte, hay dos heridos y ya llamamos a la ambulancia. El carro quedó completamente destruido.</textarea>
         </label>
+        <label class="ancho">Foto del daño (opcional)
+          <input type="file" name="imagen" id="imagenInput" accept="image/jpeg,image/png,image/webp">
+        </label>
+        <img id="previsualizacion" class="previsualizacion" alt="Previsualización de la foto adjunta" hidden>
         <div class="ejemplos">
           <span>Casos de prueba:</span>
           <button type="button" data-caso="critico">Crítico</button>
@@ -116,6 +120,12 @@
       </header>
 
       <blockquote class="relato" id="detRelato"></blockquote>
+
+      <div class="imagen-adjunta" id="imagenAdjunta" hidden>
+        <h4>Foto adjunta</h4>
+        <img id="imagenAdjuntaImg" alt="Foto del siniestro adjuntada por el cliente">
+        <p class="sub" id="imagenAnalisis"></p>
+      </div>
 
       <div class="resumen-agente" id="resumenAgente" hidden>
         <h4>Resumen para el ajustador</h4>

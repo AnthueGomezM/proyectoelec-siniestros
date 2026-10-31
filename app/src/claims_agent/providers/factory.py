@@ -10,6 +10,7 @@ import logging
 from claims_agent.config import Settings
 from claims_agent.providers.base import LLMProvider
 from claims_agent.providers.offline import OfflineProvider
+from claims_agent.providers.vision import ImageAnalyzer, OfflineImageAnalyzer
 
 log = logging.getLogger(__name__)
 
@@ -35,3 +36,17 @@ def build_fallback(settings: Settings) -> LLMProvider | None:
     if not settings.allow_offline_fallback or settings.llm_provider == "offline":
         return None
     return OfflineProvider()
+
+
+def build_image_analyzer(settings: Settings) -> ImageAnalyzer:
+    """Analizador de imágenes para la herramienta `analizar_imagen_dano`."""
+    if settings.llm_provider == "gemini":
+        from claims_agent.providers.vision import GeminiImageAnalyzer  # import tardío: ver build_provider
+
+        return GeminiImageAnalyzer(
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_model,
+            base_url=settings.gemini_base_url,
+            timeout_seconds=settings.llm_timeout_seconds,
+        )
+    return OfflineImageAnalyzer()
