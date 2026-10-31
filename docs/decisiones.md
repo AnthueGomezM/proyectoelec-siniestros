@@ -28,7 +28,7 @@ objetivo de negocio es que un caso con heridos no espere en la misma fila que un
 navegador ──HTTP──► FastAPI (un contenedor)
                       ├── /api/claims        recibe el siniestro, responde 202
                       ├── agente             bucle con 4 límites + 4 herramientas
-                      │     └──► Gemini 2.0 Flash  (capa de proveedor intercambiable)
+                      │     └──► Gemini 3.5 Flash  (capa de proveedor intercambiable)
                       ├── /api/runs/{id}/stream   trazas en vivo (SSE)
                       └── PostgreSQL 16 (otro contenedor)
                             claims · policies · claim_assessments
@@ -81,9 +81,9 @@ traza como un paso `fallback` y en la base como proveedor `…+red_de_seguridad`
 
 ---
 
-## 4. Proveedor y modelo: Google Gemini 2.0 Flash
+## 4. Proveedor y modelo: Google Gemini 3.5 Flash
 
-Declarado en `.env` (`LLM_PROVIDER=gemini`, `GEMINI_MODEL=gemini-2.0-flash`).
+Declarado en `.env` (`LLM_PROVIDER=gemini`, `GEMINI_MODEL=gemini-3.5-flash`).
 
 **Por qué este y no otro:**
 
@@ -221,7 +221,7 @@ comportamiento típico.
 Contexto: 2,68 herramientas por caso · 7/7 casos borde acertados · 0 corridas degradadas.
 Archivo: [`eval/resultados/baseline-2026-10-23-offline.md`](../eval/resultados/baseline-2026-10-23-offline.md)
 
-### Gemini 2.0 Flash — PENDIENTE DE EJECUTAR
+### Gemini 3.5 Flash — PENDIENTE DE EJECUTAR
 
 Esta fila se llena el día de la demo, con la clave activa, en un solo comando:
 

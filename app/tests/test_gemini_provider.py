@@ -62,7 +62,7 @@ async def test_envia_el_formato_que_espera_gemini():
         capturado["body"] = json.loads(request.content)
         return httpx.Response(200, json=_respuesta_texto("listo"))
 
-    provider = _provider(handler, model="gemini-2.0-flash")
+    provider = _provider(handler, model="gemini-3.5-flash")
     await provider.complete(
         system="Eres el asistente de triaje.",
         messages=[
@@ -73,7 +73,7 @@ async def test_envia_el_formato_que_espera_gemini():
         tools=HERRAMIENTAS, max_output_tokens=512, timeout_seconds=10,
     )
 
-    assert "models/gemini-2.0-flash:generateContent" in capturado["url"]
+    assert "models/gemini-3.5-flash:generateContent" in capturado["url"]
     assert "key=clave-de-prueba" in capturado["url"]
     cuerpo = capturado["body"]
     assert cuerpo["systemInstruction"]["parts"][0]["text"].startswith("Eres el asistente")

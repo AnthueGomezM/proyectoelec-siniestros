@@ -57,7 +57,7 @@ class Settings:
     # --- proveedor de IA ---
     llm_provider: str = "gemini"          # gemini | offline
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     llm_timeout_seconds: float = 10.0
     llm_temperature: float = 0.0
@@ -100,7 +100,7 @@ class Settings:
             database_url=database_url,
             llm_provider=provider,
             gemini_api_key=api_key,
-            gemini_model=(env.get("GEMINI_MODEL") or "gemini-2.0-flash").strip(),
+            gemini_model=(env.get("GEMINI_MODEL") or "gemini-3.5-flash").strip(),
             gemini_base_url=(env.get("GEMINI_BASE_URL")
                              or "https://generativelanguage.googleapis.com/v1beta").rstrip("/"),
             llm_timeout_seconds=_float(env, "LLM_TIMEOUT_SECONDS", 10.0),

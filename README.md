@@ -51,7 +51,7 @@ Cuando termine verás:
 ```
 ✓ Dashboard:   http://localhost:8000
 ✓ API (docs):  http://localhost:8000/api/docs
-✓ Motor de IA: gemini gemini-2.0-flash
+✓ Motor de IA: gemini gemini-3.5-flash
 ```
 
 **Sin clave de Gemini también arranca.** `run.sh` lo detecta y levanta en modo
@@ -167,12 +167,12 @@ añadir Groq u OpenAI es una clase nueva y una línea en `providers/factory.py`.
 
 ## Proveedor de IA y credenciales
 
-- **Proveedor:** Google Gemini · **Modelo:** `gemini-2.0-flash`
+- **Proveedor:** Google Gemini · **Modelo:** `gemini-3.5-flash`
 - **Por qué:** costo cero en la capa gratuita para el volumen del triaje (~1.900 tokens
   por caso), baja latencia —el agente encadena 3 a 5 llamadas por siniestro— y
   `functionDeclarations` con JSON Schema completo, que permite validar los argumentos
   antes de ejecutar. La justificación larga y la comparación con Groq y OpenAI están en
-  [`docs/decisiones.md`](docs/decisiones.md#4-proveedor-y-modelo-google-gemini-20-flash).
+  [`docs/decisiones.md`](docs/decisiones.md#4-proveedor-y-modelo-google-gemini-35-flash).
 - **Credenciales:** solo por variable de entorno. `.env.example` declara
   `GEMINI_API_KEY=`, `GEMINI_MODEL=` y `DATABASE_URL=`. **El ZIP no incluye ninguna clave
   real**; cada quien pone la suya en `.env`, que está excluido por `.gitignore`.
@@ -200,7 +200,7 @@ sin nivel de urgencia.
 22 casos dorados escritos con criterio de ajustador antes de ejecutarlos, 7 de ellos
 casos borde. Todas las cifras son medianas.
 
-| Cifra | Motor determinista (2026-10-23) | Gemini 2.0 Flash |
+| Cifra | Motor determinista (2026-10-23) | Gemini 3.5 Flash |
 |---|---|---|
 | Exactitud de urgencia | 100,0 % (22/22) | `./run.sh eval --provider gemini` |
 | Detección de inconsistencias | 100,0 % (5/5, 1 falso positivo) | ídem |

@@ -43,7 +43,7 @@ RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 class GeminiProvider(LLMProvider):
     name = "gemini"
 
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash",
+    def __init__(self, api_key: str, model: str = "gemini-3.5-flash",
                  base_url: str = "https://generativelanguage.googleapis.com/v1beta",
                  temperature: float = 0.0, client: httpx.AsyncClient | None = None,
                  max_retries: int = 1) -> None:
