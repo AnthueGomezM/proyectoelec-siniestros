@@ -51,6 +51,7 @@
       $("c-tokens24").textContent = fmtNum(c.tokens_24h);
       $("c-tokens").textContent = fmtNum(tokens);
       $("c-latencia").textContent = c.latencia_media_ms ? `${(c.latencia_media_ms / 1000).toFixed(1)} s` : "—";
+      $("c-tokpor").textContent = c.corridas ? fmtNum(Math.round(tokens / c.corridas)) : "—";
       $("c-iter").textContent = c.corridas ? (c.iteraciones / c.corridas).toFixed(1) : "—";
       $("c-total").textContent = fmtNum(c.corridas);
       $("c-fallidas").textContent = fmtNum(c.fallidas);

@@ -25,6 +25,7 @@ def build_provider(settings: Settings) -> LLMProvider:
             model=settings.gemini_model,
             base_url=settings.gemini_base_url,
             temperature=settings.llm_temperature,
+            thinking_level=settings.gemini_thinking_level,
         )
     if settings.llm_provider == "offline":
         return OfflineProvider()
@@ -48,5 +49,7 @@ def build_image_analyzer(settings: Settings) -> ImageAnalyzer:
             model=settings.gemini_model,
             base_url=settings.gemini_base_url,
             timeout_seconds=settings.llm_timeout_seconds,
+            thinking_level=settings.gemini_thinking_level,
+            max_side=settings.image_max_side,
         )
     return OfflineImageAnalyzer()

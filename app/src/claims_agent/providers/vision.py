@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from claims_agent.providers.base import ProviderProtocolError, ProviderTimeout, ProviderUnavailable
+from claims_agent.storage import reducir_para_modelo
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class GeminiImageAnalyzer(ImageAnalyzer):
     def __init__(self, api_key: str, model: str = "gemini-3.5-flash",
                  base_url: str = "https://generativelanguage.googleapis.com/v1beta",
                  client: httpx.AsyncClient | None = None, timeout_seconds: float = 15.0,
-                 max_retries: int = 1) -> None:
+                 max_retries: int = 1, thinking_level: str = "", max_side: int = 1024) -> None:
         if not api_key:
             raise ValueError("GeminiImageAnalyzer requiere una API key")
         self._api_key = api_key
@@ -77,6 +78,8 @@ class GeminiImageAnalyzer(ImageAnalyzer):
         self._owns_client = client is None
         self._timeout = timeout_seconds
         self._max_retries = max_retries
+        self._thinking_level = thinking_level
+        self._max_side = max_side
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -86,6 +89,12 @@ class GeminiImageAnalyzer(ImageAnalyzer):
                       claim_type: str, description: str) -> dict[str, Any]:
         prompt = _PROMPT.format(tipo=claim_type or "desconocido",
                                 descripcion=description or "(sin relato)")
+        try:
+            # Reducir una foto de varios MB es trabajo de CPU: fuera del bucle de eventos.
+            image_bytes, mime_type = await asyncio.to_thread(
+                reducir_para_modelo, image_bytes, mime_type, self._max_side)
+        except ValueError as exc:
+            raise ProviderProtocolError(str(exc)) from exc
         body = {
             "contents": [{
                 "role": "user",
@@ -97,6 +106,8 @@ class GeminiImageAnalyzer(ImageAnalyzer):
             }],
             "generationConfig": {"temperature": 0.0, "responseMimeType": "application/json"},
         }
+        if self._thinking_level:
+            body["generationConfig"]["thinkingConfig"] = {"thinkingLevel": self._thinking_level}
 
         url = f"{self._base_url}/models/{self._model}:generateContent"
         attempt = 0

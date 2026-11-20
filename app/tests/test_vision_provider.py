@@ -17,6 +17,16 @@ from claims_agent.providers.base import ProviderProtocolError, ProviderTimeout, 
 from claims_agent.providers.vision import GeminiImageAnalyzer, OfflineImageAnalyzer
 
 
+def _img(ancho: int = 64, alto: int = 48) -> bytes:
+    """Una imagen real y diminuta: el analizador ahora la reduce con Pillow antes de enviarla."""
+    import io
+
+    from PIL import Image
+    salida = io.BytesIO()
+    Image.new("RGB", (ancho, alto), (200, 30, 30)).save(salida, "PNG")
+    return salida.getvalue()
+
+
 def _analizador(handler, **kwargs):  # type: ignore[no-untyped-def]
     cliente = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return GeminiImageAnalyzer(api_key="clave-de-prueba", client=cliente, **kwargs)
@@ -40,7 +50,7 @@ async def test_envia_la_imagen_como_inlinedata():
         }))
 
     analizador = _analizador(handler)
-    resultado = await analizador.analyze(image_bytes=b"foto", mime_type="image/jpeg",
+    resultado = await analizador.analyze(image_bytes=_img(), mime_type="image/jpeg",
                                          claim_type="AUTO", description="Choque leve")
 
     parte_imagen = capturado["body"]["contents"][0]["parts"][1]["inlineData"]
@@ -58,7 +68,7 @@ async def test_normaliza_severidad_y_confianza_invalidas():
     analizador = _analizador(lambda r: httpx.Response(200, json=_respuesta_json({
         "severidad": "CATASTROFICO", "confianza": "no-es-numero",
     })))
-    resultado = await analizador.analyze(image_bytes=b"x", mime_type="image/png",
+    resultado = await analizador.analyze(image_bytes=_img(), mime_type="image/png",
                                          claim_type="HOME", description="")
     assert resultado["severidad"] == "INDETERMINADO"
     assert resultado["confianza"] == 0.0
@@ -69,7 +79,7 @@ async def test_json_invalido_es_error_de_protocolo():
         "candidates": [{"content": {"parts": [{"text": "esto no es json"}]}, "finishReason": "STOP"}],
     }))
     with pytest.raises(ProviderProtocolError):
-        await analizador.analyze(image_bytes=b"x", mime_type="image/png", claim_type="HOME", description="")
+        await analizador.analyze(image_bytes=_img(), mime_type="image/png", claim_type="HOME", description="")
 
 
 # --------------------------------------------------------------------- fallos
@@ -83,7 +93,7 @@ async def test_429_se_reintenta_una_vez_y_luego_se_rinde():
 
     analizador = _analizador(handler, max_retries=1)
     with pytest.raises(ProviderUnavailable, match="429"):
-        await analizador.analyze(image_bytes=b"x", mime_type="image/png", claim_type="HOME", description="")
+        await analizador.analyze(image_bytes=_img(), mime_type="image/png", claim_type="HOME", description="")
     assert intentos["n"] == 2
 
 
@@ -93,7 +103,7 @@ async def test_timeout_de_red():
 
     analizador = _analizador(handler)
     with pytest.raises(ProviderTimeout):
-        await analizador.analyze(image_bytes=b"x", mime_type="image/png", claim_type="HOME", description="")
+        await analizador.analyze(image_bytes=_img(), mime_type="image/png", claim_type="HOME", description="")
 
 
 def test_no_arranca_sin_clave():
@@ -105,7 +115,7 @@ def test_no_arranca_sin_clave():
 
 async def test_offline_declara_revision_manual_sin_red():
     analizador = OfflineImageAnalyzer()
-    resultado = await analizador.analyze(image_bytes=b"x", mime_type="image/png",
+    resultado = await analizador.analyze(image_bytes=_img(), mime_type="image/png",
                                          claim_type="AUTO", description="")
     assert resultado["severidad"] == "INDETERMINADO"
     assert resultado["confianza"] == 0.0

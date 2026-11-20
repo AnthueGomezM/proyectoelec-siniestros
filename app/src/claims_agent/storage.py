@@ -9,6 +9,7 @@ cliente escape al sistema de archivos.
 
 from __future__ import annotations
 
+import io
 import uuid
 from pathlib import Path
 
@@ -47,3 +48,32 @@ def save_image(uploads_dir: Path, data: bytes, content_type: str, max_bytes: int
 def read_image(uploads_dir: Path, file_path: str) -> bytes:
     """Lee una imagen ya guardada. `file_path` siempre viene de `claim_attachments`."""
     return (uploads_dir / file_path).read_bytes()
+
+
+def reducir_para_modelo(datos: bytes, mime: str, max_lado: int, calidad: int = 80) -> tuple[bytes, str]:
+    """Versión de la foto para el modelo de visión: lado mayor <= `max_lado`, JPEG, sin metadatos.
+
+    El modelo cobra la imagen por teselas, así que una foto de celular de 4000x3000 cuesta varias
+    veces lo que una de 1024 px, sin que se vea mejor el daño. El original NO se modifica (el
+    ajustador lo ve completo); solo cambia lo que se manda al modelo. Como efecto lateral, el
+    reencodificado descarta EXIF (GPS, modelo del equipo) y cualquier dato ajeno a los píxeles.
+
+    Si la imagen ya es pequeña y la versión reducida no pesa menos, se devuelve tal cual.
+    Lanza ValueError si el archivo no se puede leer como imagen.
+    """
+    from PIL import Image, ImageOps  # import tardío: solo se necesita con un modelo de visión
+
+    Image.MAX_IMAGE_PIXELS = 60_000_000   # protege de «bombas de descompresión»
+    try:
+        with Image.open(io.BytesIO(datos)) as original:
+            imagen = ImageOps.exif_transpose(original)       # respeta la orientación del celular
+            ya_pequena = max(imagen.size) <= max_lado
+            if not ya_pequena:
+                imagen.thumbnail((max_lado, max_lado), Image.Resampling.LANCZOS)
+            salida = io.BytesIO()
+            imagen.convert("RGB").save(salida, "JPEG", quality=calidad, optimize=True)
+    except Exception as exc:  # noqa: BLE001 - Pillow lanza varios tipos según el archivo
+        raise ValueError("No se pudo leer la imagen adjunta.") from exc
+    if ya_pequena and len(salida.getvalue()) >= len(datos):
+        return datos, mime
+    return salida.getvalue(), "image/jpeg"

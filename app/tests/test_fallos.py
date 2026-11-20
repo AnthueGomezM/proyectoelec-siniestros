@@ -14,6 +14,7 @@ from dataclasses import replace
 import pytest
 
 from claims_agent.agent.loop import (
+    DETALLE_PREVIO,
     STATUS_AWAITING,
     STATUS_COMPLETED,
     STATUS_FAILED,
@@ -69,7 +70,11 @@ async def test_el_mensaje_del_fallo_es_legible_para_el_usuario(settings, fake_db
 
 
 async def test_sin_respaldo_la_corrida_falla_pero_el_siniestro_queda_clasificado(settings, fake_db, claim):
-    """Aun deshabilitando el respaldo, la red de seguridad determinista clasifica el caso."""
+    """Aun deshabilitando el respaldo y con el modelo caído, el siniestro queda clasificado.
+
+    La clasificación la hace el sistema ANTES del primer turno del modelo, así que cuando el
+    modelo falla ya existe: no hace falta ni la red de seguridad.
+    """
     settings = replace(settings, allow_offline_fallback=False)
     provider = ScriptedProvider([ProviderUnavailable("sin cuota")])
     agente = TriageAgent(settings, fake_db, provider, fallback=None)
@@ -78,7 +83,20 @@ async def test_sin_respaldo_la_corrida_falla_pero_el_siniestro_queda_clasificado
 
     assert resultado.status == STATUS_FAILED
     assert resultado.stop_reason == "proveedor_no_disponible"
-    # La red de seguridad corrió igual: el expediente no se queda sin urgencia.
+    assert fake_db.assessments and fake_db.assessments[0]["urgency"] == "CRITICAL"
+    assert "red_de_seguridad" not in fake_db.assessments[0]["provider"]
+
+
+async def test_la_red_de_seguridad_sigue_clasificando_si_no_hubo_herramientas_previas(
+        settings, fake_db, claim, monkeypatch):
+    """La red de seguridad sigue existiendo para el caso en que nada clasificó el siniestro."""
+    monkeypatch.setattr("claims_agent.agent.loop.tools_previas", lambda: [])
+    settings = replace(settings, allow_offline_fallback=False)
+    provider = ScriptedProvider([ProviderUnavailable("sin cuota")])
+
+    resultado = await TriageAgent(settings, fake_db, provider, fallback=None).run(claim)
+
+    assert resultado.status == STATUS_FAILED
     assert fake_db.assessments and fake_db.assessments[0]["urgency"] == "CRITICAL"
     assert "red_de_seguridad" in fake_db.assessments[0]["provider"]
 
@@ -128,7 +146,9 @@ async def test_argumentos_invalidos_vuelven_al_modelo_para_que_se_corrija(
 
     assert resultado.status == STATUS_COMPLETED
     pasos = await fake_db.get_steps(resultado.run_id)
-    intentos = [p for p in pasos if p["kind"] == "tool_call" and p["name"] == "consultar_poliza"]
+    # Se excluye la consulta que ejecuta el sistema antes del modelo: aquí se prueba al modelo.
+    intentos = [p for p in pasos if p["kind"] == "tool_call" and p["name"] == "consultar_poliza"
+                and p["detail"] != DETALLE_PREVIO]
     assert len(intentos) == 2
     assert intentos[0]["output"]["reintentable"] is True
     assert intentos[1]["output"]["encontrada"] is True

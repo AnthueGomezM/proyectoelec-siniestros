@@ -71,6 +71,12 @@ class Tool:
     #: (no una consulta SQL rápida) y no puede cortarse antes que esa llamada termine.
     uses_llm: bool = False
     notes: str = field(default="", compare=False)
+    #: Si no es None, la herramienta es DETERMINISTA y va siempre primero: el sistema la ejecuta
+    #: antes del primer turno del modelo con estos argumentos (sacados del siniestro) y el
+    #: modelo recibe el resultado ya en la conversación. Así no gasta un viaje completo al
+    #: modelo (con todo su contexto) para ejecutar algo que no requiere razonamiento, y su
+    #: declaración deja de enviarse en cada llamada (ver `tool_specs`).
+    args_previos: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
     def spec(self) -> ToolSpec:
         return ToolSpec(name=self.name, description=self.description, parameters=self.parameters)
@@ -288,6 +294,8 @@ TOOLS: tuple[Tool, ...] = (
             "required": ["descripcion", "tipo_siniestro"],
         },
         handler=_clasificar_urgencia,
+        args_previos=lambda c: {"descripcion": c.get("description", ""),
+                                "tipo_siniestro": c.get("claim_type", "AUTO")},
         notes="Determinista: mismo texto, mismo resultado. No llama al modelo.",
     ),
     Tool(
@@ -317,6 +325,7 @@ TOOLS: tuple[Tool, ...] = (
             "required": ["customer_id"],
         },
         handler=_consultar_poliza,
+        args_previos=lambda c: {"customer_id": c.get("customer_id", "")},
     ),
     Tool(
         name="analizar_imagen_dano",
@@ -419,4 +428,14 @@ TOOLS_BY_NAME: dict[str, Tool] = {t.name: t for t in TOOLS}
 
 
 def tool_specs() -> list[ToolSpec]:
-    return [t.spec() for t in TOOLS]
+    """Lo que se le declara al modelo en cada llamada.
+
+    Las herramientas previas NO se declaran: el sistema ya las ejecutó y sus resultados viajan
+    en la conversación. Declararlas costaba ~500 tokens de entrada en CADA iteración.
+    """
+    return [t.spec() for t in TOOLS if t.args_previos is None]
+
+
+def tools_previas() -> list[Tool]:
+    """Herramientas que el sistema ejecuta antes del modelo, en orden."""
+    return [t for t in TOOLS if t.args_previos is not None]

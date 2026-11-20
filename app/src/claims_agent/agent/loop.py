@@ -41,6 +41,7 @@ from claims_agent.agent.tools import (
     ToolExecutionError,
     ToolValidationError,
     tool_specs,
+    tools_previas,
     validate_arguments,
 )
 from claims_agent.config import Settings
@@ -56,6 +57,11 @@ from claims_agent.providers.offline import OfflineProvider
 from claims_agent.providers.vision import ImageAnalyzer, OfflineImageAnalyzer
 
 log = logging.getLogger(__name__)
+
+#: Marca de los pasos de herramientas que el sistema ejecutó antes del modelo (ver
+#: Tool.args_previos). Al reanudar tras una aprobación, el historial se reconstruye desde la
+#: traza y esta marca indica que ese paso hay que presentarlo como llamada + respuesta.
+DETALLE_PREVIO = "ejecutada por el sistema antes del modelo"
 
 STATUS_COMPLETED = "COMPLETED"
 STATUS_AWAITING = "AWAITING_CONFIRMATION"
@@ -147,10 +153,38 @@ class TriageAgent:
                     "run_id": str(run_id), "tokens_24h": gastados,
                     "techo": self.settings.llm_daily_token_budget})
 
+        # --- herramientas deterministas: las ejecuta el sistema, no el modelo -----------
+        messages, idx = await self._ejecutar_previas(run_id, claim, messages, idx)
+
         return await self._loop(run_id=run_id, claim=claim, messages=messages, start_idx=idx,
                                 iterations=0, tokens_in=0, tokens_out=0,
                                 provider=provider, degraded=degraded,
                                 started=time.perf_counter())
+
+    def _contexto(self, claim: dict[str, Any]) -> ToolContext:
+        return ToolContext(db=self.db, claim=claim, classifier=self.classifier,
+                           uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer,
+                           reader=self.reader)
+
+    async def _ejecutar_previas(self, run_id: UUID, claim: dict[str, Any], messages: list[Msg],
+                                idx: int) -> tuple[list[Msg], int]:
+        """Ejecuta clasificar_urgencia y consultar_poliza y las deja en el historial.
+
+        Entran como pares «el modelo llamó / la herramienta respondió» (el mismo formato que usa
+        la reanudación tras una aprobación), así el modelo ve el resultado como cualquier otro y
+        el resto del bucle no necesita saber que no las pidió él.
+        """
+        ctx = self._contexto(claim)
+        for tool in tools_previas():
+            args = tool.args_previos(claim)  # type: ignore[misc]
+            resultado, latencia = await self._execute_tool(tool, ctx, args)
+            await self.db.add_step(run_id, idx=idx, kind="tool_call", name=tool.name,
+                                   detail=DETALLE_PREVIO, input=args, output=resultado,
+                                   latency_ms=latencia)
+            idx += 1
+            messages.append(Msg(role="model", tool_calls=(ToolCall(tool.name, args),)))
+            messages.append(Msg(role="tool", tool_name=tool.name, tool_result=resultado))
+        return messages, idx
 
     async def _tokens_del_dia(self) -> int:
         """Consumo de las últimas 24 h. Si no se puede medir, no se bloquea el triaje."""
@@ -179,9 +213,7 @@ class TriageAgent:
         messages = _messages_from_steps(claim or {}, steps)
         idx = max(s["idx"] for s in steps) + 1
         provider = (self.fallback or OfflineProvider()) if run["degraded"] else self.provider
-        ctx = ToolContext(db=self.db, claim=claim or {}, classifier=self.classifier,
-                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer,
-                          reader=self.reader)
+        ctx = self._contexto(claim or {})
         tool = TOOLS_BY_NAME[pendiente["name"]]
         args = pendiente["input"] or {}
 
@@ -211,9 +243,7 @@ class TriageAgent:
                     start_idx: int, iterations: int, tokens_in: int, tokens_out: int,
                     provider: LLMProvider, degraded: bool, started: float) -> AgentResult:
         s = self.settings
-        ctx = ToolContext(db=self.db, claim=claim, classifier=self.classifier,
-                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer,
-                          reader=self.reader)
+        ctx = self._contexto(claim)
         specs = tool_specs()
         idx = start_idx
         deadline = started + s.agent_timeout_seconds
@@ -492,6 +522,9 @@ def _messages_from_steps(claim: dict[str, Any], steps: list[dict[str, Any]]) -> 
             elif (step["output"] or {}).get("texto"):
                 messages.append(Msg(role="model", text=step["output"]["texto"]))
         elif step["kind"] == "tool_call" and step["name"]:
+            if step["detail"] == DETALLE_PREVIO:
+                # No hubo un paso llm_call que la pidiera: se reconstruye la llamada.
+                messages.append(Msg(role="model", tool_calls=(ToolCall(step["name"], step["input"] or {}),)))
             messages.append(Msg(role="tool", tool_name=step["name"], tool_result=step["output"] or {}))
     return messages
 

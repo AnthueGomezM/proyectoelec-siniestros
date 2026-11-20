@@ -363,3 +363,50 @@ correr sobre una base existente con `./run.sh roles`.
   declara el navegador; el analizador de visión podría leer texto inyectado en la imagen),
   marcar el relato como «dato no confiable» en el prompt (ayuda, no basta), enviar la clave de
   Gemini en una cabecera en lugar de la URL, y proteger `/api/docs`.
+
+---
+
+## 12. Optimización de tokens
+
+**Problema.** En el plan gratuito de Gemini se agotaba la cuota con pocas consultas. Medido en
+5 triajes reales: **3,8 llamadas al modelo y ~9.200 tokens por triaje**, casi todo de entrada
+(~2.300 por llamada), porque cada iteración reenvía el prompt (~530 tokens), las declaraciones de
+herramientas (~1.210) y el historial. Una corrida crítica llegó a 10.353 tokens y el tope por
+corrida (8.000) la cortó con `LIMIT_REACHED`: el peso del contexto no solo gastaba cuota, también
+truncaba triajes.
+
+**Qué se cambió y por qué.**
+
+| Cambio | Dónde | Efecto |
+|---|---|---|
+| El sistema ejecuta `clasificar_urgencia` y `consultar_poliza` **antes** del modelo | `agent/loop.py` `_ejecutar_previas`, `Tool.args_previos` | Son deterministas y el prompt ya obligaba a llamarlas siempre primero: eran 2 viajes completos solo para ejecutar código |
+| Esas dos herramientas **ya no se declaran** al modelo | `tools.tool_specs()` | ~500 tokens menos en cada llamada |
+| Prompt `sistema-v4` y mensaje del siniestro en JSON compacto | `agent/prompts.py` | Las instrucciones de póliza e inconsistencias pasaron al prompt; menos espacios |
+| `thinkingLevel` de Gemini en `low` (configurable) | `GEMINI_THINKING_LEVEL` | Los tokens de razonamiento gastan cuota aunque no se vean |
+| La foto se reduce a 1024 px (JPEG) **solo para el modelo** | `storage.reducir_para_modelo`, `IMAGE_MAX_SIDE` | Una foto de celular se factura por teselas; el original no se toca. Además descarta EXIF |
+| Tokens por corrida en la vista de TI | `ti.html` | Para vigilar el número que importa |
+
+Las herramientas previas dejan su paso en la traza (marcado con `DETALLE_PREVIO`) y, al reanudar
+tras una aprobación, el historial se reconstruye con la llamada y la respuesta. Se mantiene la
+decisión de arquitectura de que el modelo decide el resto: foto, siniestros similares y asignación.
+
+**Resultado medido con Gemini real** (2 casos; muestra pequeña):
+
+| Caso | Antes (promedio de 5) | Después |
+|---|---|---|
+| Crítico con foto de 3200x2400, con aprobación humana | 9.171 tokens, 3,8 iteraciones | **4.704 tokens, 2 iteraciones** |
+| Inconsistente (crítico), con aprobación humana | | **4.561 tokens, 2 iteraciones** |
+| Leve | | petición aislada: **1.753 tokens, 1 llamada** (ver abajo) |
+
+Un efecto buscado: con las dos herramientas ya resueltas, el modelo pide en **una sola llamada**
+todas las que quedan (foto, similares y asignar), y cierra con una segunda.
+
+**Lo que NO quedó demostrado.**
+- El caso leve no completó dentro de la app: Gemini respondió 503 y luego tardó 13-24 s por
+  petición (A respondió en 2,6 s). Reproducida aislada, la petición era válida (`finishReason=STOP`).
+  Es latencia del proveedor en ese momento, pero no se midió un triaje leve completo.
+- Con 2 casos reales no se puede afirmar un porcentaje general; el orden de magnitud es ~50 %.
+- **Las llamadas de visión no se cuentan.** `GeminiImageAnalyzer` descarta `usageMetadata`, así
+  que ni `agent_runs` ni el techo diario ven esos tokens. Es el siguiente hueco de medición.
+- No se probó `GEMINI_THINKING_LEVEL=minimal`, que podría bajar también la latencia.
+

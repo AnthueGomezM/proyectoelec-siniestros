@@ -90,6 +90,10 @@ class Settings:
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     llm_timeout_seconds: float = 10.0
     llm_temperature: float = 0.0
+    #: Esfuerzo de razonamiento de Gemini 3 ("minimal", "low", "medium", "high"; vacío = el del
+    #: modelo). Los tokens de razonamiento gastan cuota aunque no se vean; para un triaje con reglas
+    #: claras no hace falta pensar mucho.
+    gemini_thinking_level: str = "low"
     # --- LÍMITE 1..4 del bucle agéntico (ver docs/decisiones.md) ---
     agent_max_iterations: int = 6
     agent_timeout_seconds: float = 45.0
@@ -114,6 +118,9 @@ class Settings:
     # --- imágenes adjuntas ---
     uploads_dir: str = "/data/uploads"
     max_image_mb: int = 8
+    #: Lado mayor (px) al que se reduce la foto ANTES de enviarla al modelo de visión: una foto de
+    #: celular se factura por teselas, y una de 4000x3000 cuesta varias veces lo que una de 1024.
+    image_max_side: int = 1024
     # --- servidor ---
     app_port: int = 8000
     log_level: str = "INFO"
@@ -160,6 +167,7 @@ class Settings:
                              or "https://generativelanguage.googleapis.com/v1beta").rstrip("/"),
             llm_timeout_seconds=_float(env, "LLM_TIMEOUT_SECONDS", 10.0),
             llm_temperature=_float(env, "LLM_TEMPERATURE", 0.0, minimum=0.0),
+            gemini_thinking_level=(env.get("GEMINI_THINKING_LEVEL", "low") or "").strip().lower(),
             agent_max_iterations=_int(env, "AGENT_MAX_ITERATIONS", 6),
             agent_timeout_seconds=_float(env, "AGENT_TIMEOUT_SECONDS", 45.0),
             agent_max_tokens=_int(env, "AGENT_MAX_TOKENS", 8000, minimum=256),
@@ -177,6 +185,7 @@ class Settings:
             allow_offline_fallback=_bool(env, "ALLOW_OFFLINE_FALLBACK", True),
             uploads_dir=(env.get("UPLOADS_DIR") or "/data/uploads").strip(),
             max_image_mb=_int(env, "MAX_IMAGE_MB", 8, minimum=1),
+            image_max_side=_int(env, "IMAGE_MAX_SIDE", 1024, minimum=256),
             app_port=_int(env, "APP_PORT", 8000),
             log_level=(env.get("LOG_LEVEL") or "INFO").strip().upper(),
         )

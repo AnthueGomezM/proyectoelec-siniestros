@@ -46,7 +46,7 @@ class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = "gemini-3.5-flash",
                  base_url: str = "https://generativelanguage.googleapis.com/v1beta",
                  temperature: float = 0.0, client: httpx.AsyncClient | None = None,
-                 max_retries: int = 1) -> None:
+                 max_retries: int = 1, thinking_level: str = "") -> None:
         if not api_key:
             raise ValueError("GeminiProvider requiere una API key")
         self._api_key = api_key
@@ -56,6 +56,7 @@ class GeminiProvider(LLMProvider):
         self._client = client or httpx.AsyncClient()
         self._owns_client = client is None
         self._max_retries = max_retries
+        self._thinking_level = thinking_level
 
     @property
     def model(self) -> str:
@@ -77,6 +78,8 @@ class GeminiProvider(LLMProvider):
                 "maxOutputTokens": max_output_tokens,
             },
         }
+        if self._thinking_level:
+            body["generationConfig"]["thinkingConfig"] = {"thinkingLevel": self._thinking_level}
         if tools:
             body["tools"] = [{
                 "functionDeclarations": [
