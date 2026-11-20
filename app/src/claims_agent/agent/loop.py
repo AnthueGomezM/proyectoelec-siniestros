@@ -52,6 +52,7 @@ from claims_agent.providers.base import (
     ProviderError,
     ToolCall,
 )
+from claims_agent.providers.offline import OfflineProvider
 from claims_agent.providers.vision import ImageAnalyzer, OfflineImageAnalyzer
 
 log = logging.getLogger(__name__)
@@ -104,9 +105,12 @@ class TriageAgent:
                  fallback: LLMProvider | None = None,
                  classifier: UrgencyClassifier | None = None,
                  image_analyzer: ImageAnalyzer | None = None,
-                 uploads_dir: Path | None = None) -> None:
+                 uploads_dir: Path | None = None,
+                 reader: Database | None = None) -> None:
         self.settings = settings
         self.db = db
+        #: Conexión de solo lectura para las herramientas que consultan (mínimo privilegio).
+        self.reader = reader or db
         self.provider = provider
         self.fallback = fallback
         self.classifier = classifier or UrgencyClassifier()
@@ -124,10 +128,37 @@ class TriageAgent:
         if run_id is None:
             run_id = await self.start_run(claim)
         messages = [Msg(role="user", text=build_claim_message(claim))]
-        return await self._loop(run_id=run_id, claim=claim, messages=messages, start_idx=0,
+        provider, degraded, idx = self.provider, False, 0
+
+        # --- LÍMITE 5: techo diario de gasto ----------------------------------------
+        # El tope por corrida no frena a quien manda muchos reportes. Superado el techo,
+        # el triaje sigue con el motor de reglas (cero tokens): el siniestro se clasifica
+        # igual, pero un flujo de reportes hostil ya no puede seguir gastando la cuota.
+        if self.settings.llm_daily_token_budget > 0 and not isinstance(provider, OfflineProvider):
+            gastados = await self._tokens_del_dia()
+            if gastados >= self.settings.llm_daily_token_budget:
+                provider, degraded = self.fallback or OfflineProvider(), True
+                await self.db.add_step(
+                    run_id, idx=0, kind="limit", name="presupuesto_diario",
+                    detail=(f"Se consumieron {gastados} de {self.settings.llm_daily_token_budget} tokens "
+                            "en 24 h; este triaje corre en modo determinista."))
+                idx = 1
+                log.warning("Techo diario de tokens alcanzado", extra={
+                    "run_id": str(run_id), "tokens_24h": gastados,
+                    "techo": self.settings.llm_daily_token_budget})
+
+        return await self._loop(run_id=run_id, claim=claim, messages=messages, start_idx=idx,
                                 iterations=0, tokens_in=0, tokens_out=0,
-                                provider=self.provider, degraded=False,
+                                provider=provider, degraded=degraded,
                                 started=time.perf_counter())
+
+    async def _tokens_del_dia(self) -> int:
+        """Consumo de las últimas 24 h. Si no se puede medir, no se bloquea el triaje."""
+        try:
+            return int(await self.db.tokens_last_24h())
+        except Exception:  # noqa: BLE001 - medir no puede impedir clasificar un siniestro
+            log.exception("No se pudo medir el consumo diario de tokens")
+            return 0
 
     async def resume(self, run_id: UUID, *, approved: bool, by: str) -> AgentResult:
         """Continúa una corrida detenida esperando confirmación humana."""
@@ -147,9 +178,10 @@ class TriageAgent:
 
         messages = _messages_from_steps(claim or {}, steps)
         idx = max(s["idx"] for s in steps) + 1
-        provider = self.fallback if (run["degraded"] and self.fallback) else self.provider
+        provider = (self.fallback or OfflineProvider()) if run["degraded"] else self.provider
         ctx = ToolContext(db=self.db, claim=claim or {}, classifier=self.classifier,
-                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer)
+                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer,
+                          reader=self.reader)
         tool = TOOLS_BY_NAME[pendiente["name"]]
         args = pendiente["input"] or {}
 
@@ -180,7 +212,8 @@ class TriageAgent:
                     provider: LLMProvider, degraded: bool, started: float) -> AgentResult:
         s = self.settings
         ctx = ToolContext(db=self.db, claim=claim, classifier=self.classifier,
-                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer)
+                          uploads_dir=self.uploads_dir, image_analyzer=self.image_analyzer,
+                          reader=self.reader)
         specs = tool_specs()
         idx = start_idx
         deadline = started + s.agent_timeout_seconds

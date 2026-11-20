@@ -49,6 +49,35 @@ def _bool(env: Mapping[str, str], key: str, default: bool) -> bool:
     return raw in {"1", "true", "yes", "si", "sí", "on"}
 
 
+ROLES = ("trabajador", "ti")
+
+
+def _usuarios(raw: str) -> tuple[tuple[str, str, str], ...]:
+    """Lee AUTH_USERS: `usuario:rol:clave;usuario:rol:clave`.
+
+    La clave va al final y puede contener ':' (se parte solo en los dos primeros). No puede
+    contener ';'. Falla con un mensaje claro: una cuenta mal escrita no debe pasar en silencio.
+    """
+    usuarios: list[tuple[str, str, str]] = []
+    vistos: set[str] = set()
+    for entrada in (e.strip() for e in raw.split(";")):
+        if not entrada:
+            continue
+        partes = entrada.split(":", 2)
+        if len(partes) != 3:
+            raise ConfigError("AUTH_USERS debe tener el formato usuario:rol:clave;usuario:rol:clave")
+        usuario, rol, clave = (p.strip() if i < 2 else p for i, p in enumerate(partes))
+        if not usuario or usuario in vistos:
+            raise ConfigError(f"AUTH_USERS: usuario vacío o repetido ({usuario!r})")
+        if rol not in ROLES:
+            raise ConfigError(f"AUTH_USERS: el rol de {usuario!r} debe ser uno de {ROLES}; se recibió {rol!r}")
+        if len(clave) < 8:
+            raise ConfigError(f"AUTH_USERS: la clave de {usuario!r} debe tener al menos 8 caracteres")
+        vistos.add(usuario)
+        usuarios.append((usuario, rol, clave))
+    return tuple(usuarios)
+
+
 @dataclass(frozen=True)
 class Settings:
     """Configuración efectiva del proceso."""
@@ -66,6 +95,20 @@ class Settings:
     agent_timeout_seconds: float = 45.0
     agent_max_tokens: int = 8000
     agent_require_confirmation: bool = True
+    # --- gasto: techo diario, además del tope por corrida (0 = sin techo) ---
+    llm_daily_token_budget: int = 200_000
+    # --- acceso del personal (cliente sigue siendo público) ---
+    auth_users: tuple[tuple[str, str, str], ...] = ()   # (usuario, rol, clave)
+    auth_disabled: bool = False                          # solo desarrollo; ver .env.example
+    session_secret: str = ""                             # vacío = se genera al arrancar
+    session_ttl_minutes: int = 480
+    auth_cookie_secure: bool = False                     # true si se sirve por HTTPS
+    # --- frecuencia: protege la cuota y el costo del modelo ---
+    rate_claims_per_minute: int = 10
+    rate_claims_per_hour: int = 60
+    rate_login_failures: int = 5                         # por IP, en ventana de 5 minutos
+    # --- base de datos: rol de solo lectura para las herramientas del agente ---
+    agent_database_url: str = ""
     # --- degradación ---
     allow_offline_fallback: bool = True
     # --- imágenes adjuntas ---
@@ -99,6 +142,15 @@ class Settings:
                 "Pon tu clave en .env o usa LLM_PROVIDER=offline para correr sin IA externa."
             )
 
+        auth_disabled = _bool(env, "AUTH_DISABLED", False)
+        auth_users = _usuarios(env.get("AUTH_USERS") or "")
+        if not auth_users and not auth_disabled:
+            raise ConfigError(
+                "Falta AUTH_USERS: las vistas del trabajador y de TI exigen inicio de sesión. "
+                "Define al menos una cuenta (usuario:rol:clave, roles: trabajador o ti) en .env, "
+                "o pon AUTH_DISABLED=true solo para desarrollo local."
+            )
+
         return cls(
             database_url=database_url,
             llm_provider=provider,
@@ -112,6 +164,16 @@ class Settings:
             agent_timeout_seconds=_float(env, "AGENT_TIMEOUT_SECONDS", 45.0),
             agent_max_tokens=_int(env, "AGENT_MAX_TOKENS", 8000, minimum=256),
             agent_require_confirmation=_bool(env, "AGENT_REQUIRE_CONFIRMATION", True),
+            llm_daily_token_budget=_int(env, "LLM_DAILY_TOKEN_BUDGET", 200_000, minimum=0),
+            auth_users=auth_users,
+            auth_disabled=auth_disabled,
+            session_secret=(env.get("SESSION_SECRET") or "").strip(),
+            session_ttl_minutes=_int(env, "SESSION_TTL_MINUTES", 480),
+            auth_cookie_secure=_bool(env, "AUTH_COOKIE_SECURE", False),
+            rate_claims_per_minute=_int(env, "RATE_CLAIMS_PER_MINUTE", 10),
+            rate_claims_per_hour=_int(env, "RATE_CLAIMS_PER_HOUR", 60),
+            rate_login_failures=_int(env, "RATE_LOGIN_FAILURES", 5),
+            agent_database_url=(env.get("AGENT_DATABASE_URL") or "").strip(),
             allow_offline_fallback=_bool(env, "ALLOW_OFFLINE_FALLBACK", True),
             uploads_dir=(env.get("UPLOADS_DIR") or "/data/uploads").strip(),
             max_image_mb=_int(env, "MAX_IMAGE_MB", 8, minimum=1),
@@ -133,6 +195,11 @@ class Settings:
                 "confirmacion_humana": self.agent_require_confirmation,
             },
             "fallback_offline": self.allow_offline_fallback,
+            "presupuesto_diario_tokens": self.llm_daily_token_budget or "sin techo",
+            "acceso": ("DESACTIVADO (solo desarrollo)" if self.auth_disabled
+                       else f"{len(self.auth_users)} cuenta(s)"),
+            "base_agente": ("rol de solo lectura" if self.agent_database_url
+                            else "misma conexión que la app (sin rol separado)"),
         }
 
 

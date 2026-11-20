@@ -9,6 +9,7 @@
 #   ./run.sh logs         sigue los logs de la aplicación
 #   ./run.sh down         apaga todo (conserva los datos)
 #   ./run.sh reset        apaga y borra la base de datos para empezar de cero
+#   ./run.sh roles        (re)aplica el rol de solo lectura del agente en la base
 #
 # Todas las rutas son relativas al repositorio: funciona desde cualquier carpeta.
 # =============================================================================
@@ -45,6 +46,12 @@ preparar_env() {
   # shellcheck disable=SC1091
   set -a; source .env; set +a
 
+  if [[ -z "${AUTH_USERS:-}" && "${AUTH_DISABLED:-false}" != "true" ]]; then
+    error "Falta AUTH_USERS en .env: las vistas del trabajador y de TI exigen inicio de sesión."
+    error "Copia la línea AUTH_USERS de .env.example (y cambia las claves), o pon AUTH_DISABLED=true solo en desarrollo."
+    exit 1
+  fi
+
   if [[ "${LLM_PROVIDER:-gemini}" == "gemini" && -z "${GEMINI_API_KEY:-}" ]]; then
     aviso "GEMINI_API_KEY está vacía en .env."
     aviso "Consigue una gratis en https://aistudio.google.com/apikey y pégala allí."
@@ -68,16 +75,28 @@ esperar_salud() {
   return 1
 }
 
+# Crea o actualiza el rol de solo lectura que usa el agente. Es idempotente y hace falta en
+# bases creadas antes de que existiera, porque los scripts de db/ solo corren con un volumen nuevo.
+aplicar_roles() {
+  if docker compose exec -T db sh -c 'sh /docker-entrypoint-initdb.d/03-roles.sh' >/dev/null 2>&1; then
+    ok "Rol de solo lectura del agente listo (claims_agent_ro)."
+  else
+    aviso "No se pudo aplicar db/03-roles.sh. Reintenta con: ./run.sh roles"
+  fi
+}
+
 arrancar() {
   comprobar_docker
   preparar_env
   info "Construyendo y levantando contenedores…"
   LLM_PROVIDER="${LLM_PROVIDER:-gemini}" docker compose up --build -d
+  aplicar_roles
   esperar_salud || exit 1
   echo
-  ok "Dashboard:   http://localhost:${APP_PORT:-8000}"
+  ok "Cliente:     http://localhost:${APP_PORT:-8000}"
+  ok "Trabajador:  http://localhost:${APP_PORT:-8000}/trabajador   (pide usuario y clave de AUTH_USERS)"
+  ok "TI:          http://localhost:${APP_PORT:-8000}/ti           (pide usuario y clave de AUTH_USERS)"
   ok "API (docs):  http://localhost:${APP_PORT:-8000}/api/docs"
-  ok "Motor de IA: $(curl -fsS "http://localhost:${APP_PORT:-8000}/api/config" | python3 -c 'import sys,json;c=json.load(sys.stdin);print(c["proveedor"], c["modelo"])' 2>/dev/null || echo 'consultar /api/config')"
   echo
   info "Siguiente paso sugerido: ./run.sh check   (verifica la clave del modelo)"
 }
@@ -112,6 +131,11 @@ case "${1:-up}" in
     docker compose logs -f app
     ;;
 
+  roles)
+    comprobar_docker
+    aplicar_roles
+    ;;
+
   down)
     docker compose down
     ok "Contenedores detenidos. Los datos siguen en el volumen pgdata."
@@ -123,7 +147,7 @@ case "${1:-up}" in
     ;;
 
   *)
-    sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac

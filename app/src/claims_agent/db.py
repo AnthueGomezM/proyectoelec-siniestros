@@ -164,13 +164,13 @@ class Database:
     # ------------------------------------------------------------------ herramientas del agente
 
     async def get_policy(self, customer_id: str) -> dict[str, Any] | None:
+        """Lee de la vista `agent_policies`: la póliza SIN el nombre del titular (ver db/03-roles.sh)."""
         async with self._pool.connection() as conn:
             cur = await conn.execute(
                 """
-                SELECT customer_id, holder_name, product, status, coverage_limit, deductible,
-                       valid_from, valid_to, city,
-                       (CURRENT_DATE BETWEEN valid_from AND valid_to) AS vigente
-                FROM policies WHERE customer_id = %s
+                SELECT customer_id, product, status, coverage_limit, deductible,
+                       valid_from, valid_to, city, vigente
+                FROM agent_policies WHERE customer_id = %s
                 """,
                 (customer_id,),
             )
@@ -349,6 +349,87 @@ class Database:
             )
             row = await cur.fetchone()
         return dict(row) if row else None
+
+    # ------------------------------------------------------------------ operación (vista de TI)
+
+    async def stats(self) -> dict[str, Any]:
+        """Cifras agregadas para el panel de TI: siniestros, corridas y consumo de tokens."""
+        async with self._pool.connection() as conn:
+            cur = await conn.execute("SELECT status, count(*) AS n FROM claims GROUP BY status")
+            por_estado = {r["status"]: int(r["n"]) for r in await cur.fetchall()}
+
+            cur = await conn.execute(
+                "SELECT urgency_level, count(*) AS n FROM claim_assessments GROUP BY urgency_level")
+            por_urgencia = {r["urgency_level"]: int(r["n"]) for r in await cur.fetchall()}
+
+            cur = await conn.execute(
+                """
+                SELECT count(*)                                              AS corridas,
+                       count(*) FILTER (WHERE status = 'FAILED')             AS fallidas,
+                       count(*) FILTER (WHERE status = 'LIMIT_REACHED')      AS por_limite,
+                       count(*) FILTER (WHERE status = 'AWAITING_CONFIRMATION') AS esperando,
+                       count(*) FILTER (WHERE degraded)                      AS degradadas,
+                       COALESCE(sum(tokens_in), 0)                           AS tokens_in,
+                       COALESCE(sum(tokens_out), 0)                          AS tokens_out,
+                       COALESCE(sum(iterations), 0)                          AS iteraciones,
+                       COALESCE(avg(latency_ms) FILTER (WHERE latency_ms IS NOT NULL), 0)::int
+                                                                             AS latencia_media_ms,
+                       count(*) FILTER (WHERE started_at > now() - interval '24 hours')
+                                                                             AS corridas_24h,
+                       COALESCE(sum(tokens_in + tokens_out)
+                                FILTER (WHERE started_at > now() - interval '24 hours'), 0)
+                                                                             AS tokens_24h
+                FROM agent_runs
+                """
+            )
+            corridas = dict(await cur.fetchone())  # type: ignore[arg-type]
+        return {
+            "siniestros_por_estado": por_estado,
+            "siniestros_por_urgencia": por_urgencia,
+            "corridas": {k: int(v) for k, v in corridas.items()},
+        }
+
+    async def tokens_last_24h(self) -> int:
+        """Tokens gastados por el agente en las últimas 24 h (base del techo diario)."""
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                """
+                SELECT COALESCE(sum(tokens_in + tokens_out), 0) AS n
+                FROM agent_runs WHERE started_at > now() - interval '24 hours'
+                """
+            )
+            row = await cur.fetchone()
+        return int(row["n"])  # type: ignore[index]
+
+    async def list_runs(self, limit: int = 25) -> list[dict[str, Any]]:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                """
+                SELECT r.id, r.claim_id, c.customer_id, r.provider, r.model, r.status,
+                       r.stop_reason, r.degraded, r.iterations, r.tokens_in, r.tokens_out,
+                       r.latency_ms, r.started_at
+                FROM agent_runs r
+                LEFT JOIN claims c ON c.id = r.claim_id
+                ORDER BY r.started_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return [dict(r) for r in await cur.fetchall()]
+
+    async def recent_errors(self, limit: int = 15) -> list[dict[str, Any]]:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                """
+                SELECT s.run_id, s.kind, s.name, s.detail, s.created_at
+                FROM agent_steps s
+                WHERE s.kind IN ('error', 'fallback', 'limit')
+                ORDER BY s.created_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def connection(self) -> AsyncConnection:  # pragma: no cover - utilidad para scripts
         return await self._pool.getconn()

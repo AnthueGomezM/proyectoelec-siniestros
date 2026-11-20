@@ -48,6 +48,14 @@ class ToolContext:
     classifier: UrgencyClassifier
     uploads_dir: Path
     image_analyzer: ImageAnalyzer
+    #: Conexión de SOLO LECTURA (rol claims_agent_ro). Las herramientas que solo consultan
+    #: la usan; únicamente `asignar_ajustador`, ya aprobada por una persona, usa `db`.
+    #: Si no se configura, cae en `db` (pruebas y arranque sin rol separado).
+    reader: Database | None = None
+
+    @property
+    def lector(self) -> Database:
+        return self.reader or self.db
 
 
 @dataclass(frozen=True)
@@ -136,17 +144,42 @@ def validate_arguments(schema: dict[str, Any], arguments: dict[str, Any]) -> dic
 
 # ---------------------------------------------------------------------------- implementaciones
 
+def _del_siniestro(ctx: ToolContext, clave_claim: str, args: dict[str, Any],
+                   clave_arg: str, herramienta: str) -> str:
+    """El dato sale del siniestro guardado, NUNCA de lo que el modelo escriba.
+
+    El texto del relato es contenido no confiable: si una inyección convence al modelo de
+    llamar a `clasificar_urgencia` con otro relato ("solo un rayón"), o a `consultar_poliza`
+    con el cliente de otra persona, el modelo estaría gobernando una herramienta que
+    debería ser determinista. Por eso el argumento del modelo se descarta y el valor se lee
+    del expediente. Si ambos difieren, queda un aviso en el log: es la huella de una
+    inyección (o de un modelo confundido), y vale la pena mirarla.
+    """
+    real = ctx.claim.get(clave_claim)
+    pedido = args.get(clave_arg)
+    if real in (None, ""):
+        # Sin siniestro asociado (herramienta invocada de forma aislada, p. ej. en pruebas).
+        return str(pedido or "")
+    if pedido not in (None, "") and str(pedido).strip() != str(real).strip():
+        log.warning("Argumento del modelo ignorado: no coincide con el siniestro guardado",
+                    extra={"herramienta": herramienta, "campo": clave_arg,
+                           "claim_id": str(ctx.claim.get("id", ""))})
+    return str(real)
+
+
 async def _clasificar_urgencia(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
-    assessment = ctx.classifier.classify(args["descripcion"], args.get("tipo_siniestro"))
-    return assessment.to_dict()
+    descripcion = _del_siniestro(ctx, "description", args, "descripcion", "clasificar_urgencia")
+    tipo = _del_siniestro(ctx, "claim_type", args, "tipo_siniestro", "clasificar_urgencia") or None
+    return ctx.classifier.classify(descripcion, tipo).to_dict()
 
 
 async def _consultar_poliza(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
-    poliza = await ctx.db.get_policy(args["customer_id"].strip())
+    customer_id = _del_siniestro(ctx, "customer_id", args, "customer_id", "consultar_poliza")
+    poliza = await ctx.lector.get_policy(customer_id.strip())
     if poliza is None:
         return {
             "encontrada": False,
-            "customer_id": args["customer_id"],
+            "customer_id": customer_id,
             "mensaje": "No existe una póliza con ese identificador de cliente.",
         }
     return {
@@ -166,7 +199,7 @@ async def _analizar_imagen(ctx: ToolContext, args: dict[str, Any]) -> dict[str, 
     claim_id = ctx.claim.get("id")
     if not isinstance(claim_id, UUID):
         return {"tiene_imagen": False, "mensaje": "No hay un siniestro asociado a esta corrida."}
-    adjunto = await ctx.db.get_attachment(claim_id)
+    adjunto = await ctx.lector.get_attachment(claim_id)
     if adjunto is None:
         return {"tiene_imagen": False, "mensaje": "El cliente no adjuntó ninguna imagen con este reporte."}
     datos = read_image(ctx.uploads_dir, adjunto["file_path"])
@@ -180,9 +213,9 @@ async def _analizar_imagen(ctx: ToolContext, args: dict[str, Any]) -> dict[str, 
 
 async def _buscar_similares(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     claim_id = ctx.claim.get("id")
-    filas = await ctx.db.search_similar(
-        args["descripcion"],
-        args.get("tipo_siniestro"),
+    filas = await ctx.lector.search_similar(
+        _del_siniestro(ctx, "description", args, "descripcion", "buscar_siniestros_similares"),
+        _del_siniestro(ctx, "claim_type", args, "tipo_siniestro", "buscar_siniestros_similares") or None,
         limit=int(args.get("limite", 3)),
         exclude=claim_id if isinstance(claim_id, UUID) else None,
     )
@@ -244,12 +277,12 @@ TOOLS: tuple[Tool, ...] = (
             "properties": {
                 "descripcion": {
                     "type": "string",
-                    "description": "El relato del siniestro tal como lo escribió el cliente, sin resumir ni corregir.",
+                    "description": "Relato del siniestro. El sistema usa el relato guardado del expediente; este valor se ignora.",
                 },
                 "tipo_siniestro": {
                     "type": "string",
                     "enum": ["AUTO", "MEDICAL", "HOME"],
-                    "description": "Tipo declarado por el cliente al reportar.",
+                    "description": "Tipo del siniestro. El sistema usa el del expediente; este valor se ignora.",
                 },
             },
             "required": ["descripcion", "tipo_siniestro"],
@@ -278,7 +311,7 @@ TOOLS: tuple[Tool, ...] = (
             "properties": {
                 "customer_id": {
                     "type": "string",
-                    "description": "Identificador del cliente, con el formato CUST-000000.",
+                    "description": "Identificador del cliente. El sistema consulta el del siniestro; este valor se ignora.",
                 },
             },
             "required": ["customer_id"],
@@ -323,12 +356,12 @@ TOOLS: tuple[Tool, ...] = (
             "properties": {
                 "descripcion": {
                     "type": "string",
-                    "description": "Relato del siniestro actual; se usa para buscar coincidencias de términos.",
+                    "description": "Relato del siniestro actual. El sistema usa el del expediente; este valor se ignora.",
                 },
                 "tipo_siniestro": {
                     "type": "string",
                     "enum": ["AUTO", "MEDICAL", "HOME"],
-                    "description": "Limita la búsqueda a siniestros del mismo tipo.",
+                    "description": "Tipo del siniestro. El sistema usa el del expediente; este valor se ignora.",
                 },
                 "limite": {
                     "type": "integer",

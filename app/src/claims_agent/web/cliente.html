@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportar un siniestro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231B2A2E'/%3E%3Crect x='5' y='6' width='4' height='20' fill='%23B3261E'/%3E%3Crect x='12' y='9' width='15' height='2.5' fill='%23F2F4F3'/%3E%3Crect x='12' y='15' width='15' height='2.5' fill='%23F2F4F3'/%3E%3Crect x='12' y='21' width='9' height='2.5' fill='%23F2F4F3'/%3E%3C/svg%3E">
+</head>
+<body class="vista-cliente">
+
+<header class="guardia">
+  <div class="guardia-identidad">
+    <svg class="marca" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" fill="#1B2A2E"/><rect x="5" y="6" width="4" height="20" fill="#B3261E"/>
+      <rect x="12" y="9" width="15" height="2.5" fill="#F2F4F3"/><rect x="12" y="15" width="15" height="2.5" fill="#F2F4F3"/>
+      <rect x="12" y="21" width="9" height="2.5" fill="#F2F4F3"/>
+    </svg>
+    <div>
+      <h1>Reporte de siniestros</h1>
+      <p>Cuéntanos qué pasó y te avisamos del avance</p>
+    </div>
+  </div>
+  <nav class="nav" aria-label="Vistas">
+    <a href="/ingresar">Acceso del personal</a>
+  </nav>
+</header>
+
+<main class="una-columna">
+
+  <!-- Seguimiento: aparece al reportar y se recuerda en este navegador -->
+  <section class="tarjeta" id="seguimiento" hidden aria-labelledby="h-seguimiento">
+    <h2 id="h-seguimiento">Tu reporte fue recibido</h2>
+    <p class="lead" id="segMensaje"></p>
+    <div class="numero-seguimiento">
+      <span>Número de seguimiento</span>
+      <code id="segNumero">—</code>
+      <button type="button" class="boton-fantasma" id="copiarNumero">Copiar</button>
+    </div>
+    <ol class="progreso" id="progreso" aria-label="Avance del reporte">
+      <li data-paso="recibido">Recibido</li>
+      <li data-paso="revision">En revisión</li>
+      <li data-paso="resuelto">Resuelto</li>
+    </ol>
+    <p class="nota" id="segNota"></p>
+  </section>
+
+  <!-- Reporte -->
+  <section class="tarjeta" aria-labelledby="h-reportar">
+    <h2 id="h-reportar">Reportar un siniestro</h2>
+    <form id="formulario" novalidate>
+      <div class="campos">
+        <label>Número de cliente
+          <input name="customer_id" value="CUST-000123" required pattern="[A-Za-z0-9_-]{3,64}" spellcheck="false">
+        </label>
+        <label>Tipo de siniestro
+          <select name="claim_type">
+            <option value="AUTO">Auto</option>
+            <option value="MEDICAL">Médico</option>
+            <option value="HOME">Hogar</option>
+          </select>
+        </label>
+      </div>
+      <label class="ancho">¿Qué pasó?
+        <textarea name="description" rows="4" required minlength="10" maxlength="5000"
+          placeholder="Cuéntalo con tus palabras: dónde, cuándo y qué daños o heridos hubo.">Choque en la autopista norte, hay dos heridos y ya llamamos a la ambulancia. El carro quedó completamente destruido.</textarea>
+      </label>
+      <label class="ancho">Foto del daño (opcional)
+        <input type="file" name="imagen" id="imagenInput" accept="image/jpeg,image/png,image/webp">
+      </label>
+      <img id="previsualizacion" class="previsualizacion" alt="Previsualización de la foto adjunta" hidden>
+
+      <details class="demo">
+        <summary>Casos de prueba (demostración)</summary>
+        <div class="ejemplos">
+          <button type="button" data-caso="critico">Crítico</button>
+          <button type="button" data-caso="inconsistente">Inconsistente</button>
+          <button type="button" data-caso="leve">Leve</button>
+          <button type="button" data-caso="poliza">Póliza vencida</button>
+          <button type="button" data-caso="invalido">Inválido (error 400)</button>
+        </div>
+      </details>
+
+      <p class="error-formulario" id="errorFormulario" hidden></p>
+      <button type="submit" class="boton-principal" id="enviar">Enviar reporte</button>
+    </form>
+  </section>
+
+  <!-- Consultar un reporte anterior -->
+  <section class="tarjeta" aria-labelledby="h-consulta">
+    <h2 id="h-consulta">Consultar un reporte</h2>
+    <form id="consulta" class="consulta" novalidate>
+      <label>Número de seguimiento
+        <input name="numero" placeholder="Pega aquí el número que recibiste" spellcheck="false" autocomplete="off">
+      </label>
+      <button type="submit" class="boton-fantasma">Consultar</button>
+    </form>
+    <p class="error-formulario" id="errorConsulta" hidden></p>
+    <ul class="mis-reportes" id="misReportes" aria-label="Reportes enviados desde este navegador"></ul>
+  </section>
+</main>
+
+<div class="brindis" id="brindis" role="status" hidden></div>
+<script src="/static/comun.js"></script>
+<script src="/static/cliente.js"></script>
+</body>
+</html>

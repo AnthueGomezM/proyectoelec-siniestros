@@ -32,8 +32,9 @@ cd proyectoelec-siniestros
 
 # 2. Crea tu archivo de variables y pon la clave de Gemini
 cp .env.example .env
-#    Edita .env y pega tu clave en GEMINI_API_KEY=
-#    Se obtiene gratis en https://aistudio.google.com/apikey
+#    Edita .env y (a) pega tu clave en GEMINI_API_KEY=
+#    (se obtiene gratis en https://aistudio.google.com/apikey) y
+#    (b) cambia las claves de AUTH_USERS: son las cuentas del personal.
 
 # 3. Levanta todo
 ./run.sh
@@ -49,10 +50,15 @@ docker compose up --build
 Cuando termine verás:
 
 ```
-✓ Dashboard:   http://localhost:8000
+✓ Cliente:     http://localhost:8000
+✓ Trabajador:  http://localhost:8000/trabajador   (pide usuario y clave de AUTH_USERS)
+✓ TI:          http://localhost:8000/ti           (pide usuario y clave de AUTH_USERS)
 ✓ API (docs):  http://localhost:8000/api/docs
-✓ Motor de IA: gemini gemini-3.5-flash
 ```
+
+La interfaz tiene tres vistas: el **cliente** (reporta y consulta el estado, sin cuenta),
+el **trabajador** (cola, expediente, aprobación al agente) y **TI** (salud, límites y
+consumo). Las dos últimas exigen inicio de sesión; ver la sección *Seguridad*.
 
 **Sin clave de Gemini también arranca.** `run.sh` lo detecta y levanta en modo
 determinista (`LLM_PROVIDER=offline`): el triaje funciona con reglas, sin llamadas
@@ -73,7 +79,8 @@ Si la clave está vencida o sin cuota, te enteras aquí y no frente al salón.
 | `./run.sh` | Levanta base de datos y aplicación, y espera a que respondan |
 | `./run.sh check` | Prueba la clave del proveedor de IA con una llamada real |
 | `./run.sh eval` | Corre los 22 casos dorados y escribe la línea base en `eval/resultados/` |
-| `./run.sh test` | Corre las 85 pruebas unitarias en un contenedor limpio |
+| `./run.sh test` | Corre las pruebas unitarias en un contenedor limpio |
+| `./run.sh roles` | (Re)aplica el rol de solo lectura del agente (se hace solo al levantar) |
 | `./run.sh logs` | Sigue los logs de la aplicación |
 | `./run.sh down` | Apaga (conserva los datos) |
 | `./run.sh reset` | Apaga y borra la base para empezar de cero |
@@ -82,13 +89,17 @@ Si la clave está vencida o sin cuota, te enteras aquí y no frente al salón.
 
 ## Cómo probarlo en dos minutos
 
-1. Abre **http://localhost:8000**.
-2. En *Reportar siniestro*, pulsa el botón **Crítico** y luego **Reportar y triar**.
-3. Mira la **tira de registro** a la derecha: cada paso del agente se imprime en vivo
-   con su latencia y sus tokens.
+1. Abre **http://localhost:8000** (vista del cliente). En *Casos de prueba* pulsa **Crítico**
+   y luego **Enviar reporte**: recibes un número de seguimiento.
+2. Abre **/trabajador** e inicia sesión con una cuenta de rol `trabajador` de tu `.env`.
+   El caso aparece en la cola.
+3. Ábrelo y mira la **tira de registro**: cada paso del agente se imprime en vivo con su
+   latencia y sus tokens.
 4. El agente se detiene y pide autorización para asignar un ajustador. Pulsa
-   **Aprobar asignación**: el bucle continúa y escribe el resumen.
-5. Repite con **Inconsistente** (el cliente niega daños pero describe destrucción),
+   **Aprobar asignación**: el bucle continúa y escribe el resumen. Queda registrado quién
+   aprobó (tu usuario de sesión).
+5. Abre **/ti** con una cuenta de rol `ti` para ver salud, consumo de tokens y corridas.
+6. Repite con **Inconsistente** (el cliente niega daños pero describe destrucción),
    **Póliza vencida** (el agente debe advertirlo) e **Inválido**, que devuelve un error
    400 legible en vez de una traza.
 
@@ -125,7 +136,7 @@ app/
       lexicon.py           diccionario de urgencia con pesos (editable sin tocar código)
       classifier.py        clasificador determinista
     api/                   endpoints, SSE de trazas, manejo de errores
-    web/                   dashboard (HTML, CSS y JS sin dependencias)
+    web/                   tres vistas sin dependencias: cliente (/), trabajador (/trabajador), TI (/ti)
   tests/                   85 pruebas unitarias
 eval/
   casos_dorados.jsonl      22 casos con la urgencia que esperaría un ajustador
@@ -159,7 +170,7 @@ se guarda en un volumen Docker (`UPLOADS_DIR`), no en la base de datos; solo la 
 queda en `claim_attachments`. El agente la analiza con `analizar_imagen_dano` únicamente
 si el reporte trae imagen, y su resultado queda junto a la urgencia en el expediente.
 
-**Cuatro límites activos**, visibles en la barra superior del dashboard:
+**Cuatro límites activos**, visibles en la vista de TI (`/ti`):
 
 | Límite | Variable | Valor |
 |---|---|---|
@@ -185,6 +196,30 @@ añadir Groq u OpenAI es una clase nueva y una línea en `providers/factory.py`.
 - **Credenciales:** solo por variable de entorno. `.env.example` declara
   `GEMINI_API_KEY=`, `GEMINI_MODEL=` y `DATABASE_URL=`. **El ZIP no incluye ninguna clave
   real**; cada quien pone la suya en `.env`, que está excluido por `.gitignore`.
+
+---
+
+## Seguridad
+
+La defensa no está en el prompt, está en lo que el sistema puede hacer. Detalle y límites
+asumidos en `docs/decisiones.md` § 11. En corto:
+
+- **Las herramientas deterministas no obedecen al modelo.** `clasificar_urgencia`,
+  `consultar_poliza` y `buscar_siniestros_similares` leen el siniestro guardado e ignoran los
+  argumentos que escriba el modelo (que podría haber sido engañado por el relato).
+- **Acceso por rol.** El cliente reporta y consulta su estado sin cuenta. Trabajador y TI
+  inician sesión (cookie firmada, HttpOnly, SameSite=Strict). Quien aprueba al agente queda
+  registrado por su sesión, no por un campo editable.
+- **Mínimo privilegio en la base.** El agente consulta con el rol `claims_agent_ro`: solo
+  lectura, sin nombres de titulares ni historial, y no puede escribir aunque lo intente.
+  Postgres solo escucha en `127.0.0.1`.
+- **Gasto acotado.** Además de los cuatro límites por corrida: tope de reportes por IP,
+  tope de intentos de login y un techo diario de tokens (`LLM_DAILY_TOKEN_BUDGET`); superado,
+  los triajes siguen en modo determinista.
+- **Cabeceras y CSP** que impiden ejecutar scripts que no sean los propios.
+
+> **Si ya tenías el sistema levantado:** añade `AUTH_USERS` a tu `.env` (ver `.env.example`)
+> y corre `./run.sh`; aplica el rol del agente en tu base existente sin borrar datos.
 
 ---
 

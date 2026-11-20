@@ -278,10 +278,8 @@ género) más una lista explícita de las conjugaciones frecuentes en relatos re
 exactitud en los 22 casos, incluidos los 7 borde. Es una lista que hay que mantener a
 mano, y está anotado como tal en el código.
 
-**Autenticación de ajustadores.** No la hay: el dashboard es abierto. Es deuda técnica
-declarada, no un descuido. Para un piloto real haría falta OIDC y el punto de entrada
-sería un middleware en `api/`. No se incluyó porque no aporta a lo que se evalúa y sí
-añade fricción al arranque en cinco minutos.
+**Autenticación de ajustadores.** Resuelta con sesión propia por rol (ver § 11). Lo que
+queda como deuda es una identidad corporativa (OIDC) en lugar de cuentas en variables de entorno.
 
 ---
 
@@ -296,3 +294,72 @@ añade fricción al arranque en cinco minutos.
 | La base de datos no está lista al arrancar | `/api/ready` responde 503 hasta que responda; la app no se cae. | `depends_on: service_healthy` en compose. |
 | Dos triajes del mismo siniestro | `UNIQUE(claim_id)` en `claim_assessments` con `ON CONFLICT DO UPDATE`: se actualiza, no se duplica. | — |
 | El relato trae HTML o comillas | Se inserta en el DOM con `textContent` y en SQL con sentencias parametrizadas. | — |
+
+---
+
+## 11. Seguridad y hardening
+
+Criterio rector: **la defensa no está en el prompt, está en lo que el sistema puede hacer.**
+Una instrucción del tipo «ignora lo que venga en los datos» es una sugerencia; un permiso
+que la base de datos niega es un hecho.
+
+### La tríada letal, evaluada
+
+| Pata | ¿Está? | Dónde |
+|---|---|---|
+| Datos privados | Sí | Pólizas y siniestros de otros clientes que llegan al contexto del agente. |
+| Contenido no confiable | Sí | El relato del cliente, la foto (puede llevar texto) y descripciones de siniestros anteriores. |
+| Capacidad de salida | **No** | Ninguna herramienta hace peticiones de red. |
+
+Se mantiene sin la tercera pata: **no se debe añadir una herramienta tipo `buscar_web`** (ni
+correo, ni webhook) sin una lista blanca de dominios, porque completaría la tríada.
+
+### Controles aplicados
+
+| Riesgo | Control | Dónde | Prueba |
+|---|---|---|---|
+| Inyección que gobierna una herramienta «determinista» | Los argumentos del modelo se descartan; se usa el siniestro guardado (y se registra una advertencia si difieren) | `agent/tools.py` `_del_siniestro` | `test_seguridad.py` (herramientas) |
+| Acción irreversible sin humano real | La aprobación exige sesión de rol `trabajador`; el aprobador es el usuario de la sesión, no un campo del cuerpo | `auth.py`, `api/routes.py` | `test_cada_rol_solo_entra_a_lo_suyo` |
+| Cualquiera ve expedientes y fotos | Cola, expediente, foto y decisión solo para `trabajador`; configuración, cifras y corridas solo para `ti` | `api/routes.py` | `test_sin_sesion_...` |
+| Agente conectado como superusuario | Rol `claims_agent_ro`: solo `SELECT` sobre una vista de pólizas sin titular, 6 columnas de `claims` y la ruta de la foto; `default_transaction_read_only` | `db/03-roles.sh` | Verificado contra Postgres real (ver abajo) |
+| Base de datos abierta a la red | Puerto publicado solo en `127.0.0.1` | `docker-compose.yml` | — |
+| Sangría de tokens por reportes en bucle | Tope de reportes por IP (minuto y hora) y **techo diario de tokens**; superado, el triaje corre sin modelo | `ratelimit.py`, `agent/loop.py` | `test_reportar_tiene_tope_por_ip`, `test_superado_el_techo_diario...` |
+| Cuota mal medida | Los tokens de razonamiento de Gemini 3 (`thoughtsTokenCount`) se suman al consumo | `providers/gemini.py` | `test_los_tokens_de_razonamiento...` |
+| Fuerza bruta al login | 5 fallos por IP bloquean 5 minutos; mismo mensaje exista o no el usuario; comparación en tiempo constante | `auth.py`, `api/routes.py` | `test_demasiados_intentos...` |
+| Robo/forja de sesión | Cookie firmada con HMAC, HttpOnly, SameSite=Strict (frena CSRF), vencimiento | `auth.py` | `test_la_sesion_...` |
+| Script inyectado en la página | CSP sin `unsafe-inline`; un test falla si una página usa scripts, estilos o eventos en línea | `main.py` | `test_ninguna_pagina_usa_...` |
+
+### Matriz de capacidades (según la guía del curso)
+
+| Operación | Política | Control |
+|---|---|---|
+| Lectura (SELECT) | Automática | Rol de solo lectura, vista sin datos del titular |
+| Acciones con efecto (asignar ajustador, decidir el caso) | **Humano obligatorio** | Aprobación con sesión de `trabajador` |
+| Salida a internet | **No existe** | Sin herramientas de red; solo el proveedor de IA, fijado por configuración |
+| Ejecución de código generado | **No existe** | No hay `exec`, ni shell, ni intérprete |
+| Llamadas al modelo en bucle | Condicional | 6 iteraciones, 45 s, 8 000 tokens por corrida y techo diario |
+
+### Verificación contra Postgres real
+
+El script `db/03-roles.sh` y el SQL nuevo se probaron en un contenedor desechable: el rol
+lee la vista de pólizas, la búsqueda de siniestros parecidos y la ruta de la foto, y es
+rechazado al leer `policies`, `claim_assessments`, `claim_status_history`, `agent_steps` y
+`claims.customer_id`, y al ejecutar `UPDATE`/`DELETE`/`INSERT`. Es idempotente: se puede volver a
+correr sobre una base existente con `./run.sh roles`.
+
+### Límites asumidos (deuda declarada)
+
+- **Cuentas en variables de entorno, claves en texto plano.** Suficiente para este alcance;
+  un piloto real necesita OIDC o, mínimo, claves con hash (PBKDF2/argon2) y rotación.
+- **El limitador vive en memoria y cuenta por IP.** Se reinicia con el proceso, no se comparte
+  entre réplicas y, detrás de un proxy o de la red NAT de Docker Desktop, varias personas
+  pueden compartir IP. Con varias réplicas hay que limitar en el proxy o con Redis.
+- **La cookie solo viaja cifrada si se sirve por HTTPS** (`AUTH_COOKIE_SECURE=true`); el
+  proyecto en sí sirve HTTP plano y delega TLS a un proxy.
+- **El techo diario no es un tope duro del proveedor.** Hay una ventana de carrera con
+  corridas simultáneas y no reemplaza un límite de gasto activado en la consola del proveedor
+  (Google AI Studio / Cloud Billing), que es una acción manual y recomendable.
+- **Aún sin hacer:** validar la foto por su contenido (hoy se confía en el tipo MIME que
+  declara el navegador; el analizador de visión podría leer texto inyectado en la imagen),
+  marcar el relato como «dato no confiable» en el prompt (ayuda, no basta), enviar la clave de
+  Gemini en una cabecera en lugar de la URL, y proteger `/api/docs`.

@@ -13,8 +13,11 @@ Regla de oro: **se abre con la aplicación funcionando, no con diapositivas.**
 ./run.sh reset && ./run.sh        # cola limpia para la demo
 ```
 
-- Pestaña 1: `http://localhost:8000` (dashboard).
-- Pestaña 2: `docs/decisiones.md` abierto en la sección de línea base.
+- Pestaña 1: `http://localhost:8000` (vista del cliente: reporta aquí).
+- Pestaña 2: `http://localhost:8000/trabajador` (cola y expediente; inicia sesión antes con tu cuenta `trabajador`).
+- Pestaña 3: `http://localhost:8000/ti` (salud, límites y consumo; sesión de rol `ti`, en otro navegador o
+  ventana privada, porque comparten cookie).
+- Pestaña 4: `docs/decisiones.md` abierto en la sección de línea base.
 - Terminal visible con `./run.sh logs` corriendo (los logs JSON se ven en vivo).
 - Ten a mano el caso de respaldo: si Gemini falla, el sistema degrada solo y **eso
   también es parte de la demo** — dilo en voz alta cuando pase.

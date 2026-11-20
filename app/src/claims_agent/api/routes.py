@@ -17,13 +17,14 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from claims_agent.agent.loop import STATUS_AWAITING, TriageAgent
 from claims_agent.api.errors import problem
+from claims_agent.auth import COOKIE, Sesion, requiere
 from claims_agent.storage import ImageRejected, save_image
 
 log = logging.getLogger(__name__)
@@ -72,13 +73,42 @@ class ClaimIn(BaseModel):
 
 
 class ConfirmIn(BaseModel):
+    # Quién aprueba NO viaja en el cuerpo: sale de la sesión. Un campo editable por el
+    # navegador permitiría firmar una aprobación a nombre de otra persona.
     aprobado: bool
-    por: str = Field(default="ajustador", max_length=64)
+
+
+class LoginIn(BaseModel):
+    usuario: str = Field(min_length=1, max_length=64)
+    clave: str = Field(min_length=1, max_length=200)
 
 
 class StatusIn(BaseModel):
     estado: Literal["PENDING", "IN_REVIEW", "APPROVED", "REJECTED"]
     justificacion: str | None = Field(default=None, max_length=2000)
+
+
+# ---------------------------------------------------------------------------- acceso por rol
+# Matriz (ver docs/decisiones.md, seccion Seguridad):
+#   publico   : reportar un siniestro, ver SU estado, health/ready
+#   trabajador: cola, expediente, foto, confirmar al agente, decidir el caso
+#   ti        : configuracion, cifras y corridas
+#   ambos     : la traza de una corrida (para depurar)
+
+TRABAJADOR = Depends(requiere("trabajador"))
+SOLO_TI = Depends(requiere("ti"))
+PERSONAL = Depends(requiere("trabajador", "ti"))
+
+
+def _ip(request: Request) -> str:
+    return request.client.host if request.client else "desconocida"
+
+
+def _demasiadas(request: Request, espera: float, detalle: str) -> JSONResponse:
+    respuesta = problem(429, "Demasiadas solicitudes", detalle, request=request,
+                        extra={"reintentar_en_segundos": int(espera) + 1})
+    respuesta.headers["Retry-After"] = str(int(espera) + 1)
+    return respuesta
 
 
 # ---------------------------------------------------------------------------- utilidades
@@ -123,7 +153,7 @@ async def ready(request: Request):  # type: ignore[no-untyped-def]
 
 
 @router.get("/config", tags=["operación"])
-async def config(request: Request) -> dict[str, Any]:
+async def config(request: Request, _: Sesion = SOLO_TI) -> dict[str, Any]:
     """Configuración pública: la UI la usa para mostrar proveedor, modelo y límites."""
     s = request.app.state.settings
     return {
@@ -139,9 +169,48 @@ async def config(request: Request) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------- sesión
+
+@router.post("/auth/login", tags=["acceso"], response_model=None)
+async def iniciar_sesion(payload: LoginIn, request: Request, response: Response):  # type: ignore[no-untyped-def]
+    """Inicia sesión del personal. Cookie HttpOnly + SameSite=Strict; los fallos tienen tope por IP."""
+    auth = request.app.state.auth
+    limite = request.app.state.limite_login
+    ip = _ip(request)
+    espera = limite.espera(ip)
+    if espera > 0:
+        log.warning("Inicio de sesión bloqueado por exceso de intentos", extra={"ip": ip})
+        return _demasiadas(request, espera, "Demasiados intentos fallidos. Espera unos minutos.")
+
+    sesion = auth.credenciales_validas(payload.usuario.strip(), payload.clave)
+    if sesion is None:
+        limite.registrar(ip)
+        log.warning("Inicio de sesión fallido", extra={"usuario": payload.usuario[:64], "ip": ip})
+        # Mismo mensaje exista o no el usuario: no se revela qué cuentas hay.
+        raise HTTPException(status_code=401, detail="Usuario o clave incorrectos.")
+
+    limite.reiniciar(ip)
+    response.set_cookie(COOKIE, auth.emitir(sesion), max_age=auth.ttl_segundos, httponly=True,
+                        samesite="strict", secure=request.app.state.settings.auth_cookie_secure, path="/")
+    log.info("Inicio de sesión", extra={"usuario": sesion.usuario, "rol": sesion.rol})
+    return {"usuario": sesion.usuario, "rol": sesion.rol,
+            "destino": "/ti" if sesion.rol == "ti" else "/trabajador"}
+
+
+@router.post("/auth/logout", tags=["acceso"])
+async def cerrar_sesion(response: Response) -> dict[str, str]:
+    response.delete_cookie(COOKIE, path="/")
+    return {"estado": "sesión cerrada"}
+
+
+@router.get("/auth/me", tags=["acceso"])
+async def quien_soy(sesion: Sesion = PERSONAL) -> dict[str, str]:
+    return {"usuario": sesion.usuario, "rol": sesion.rol}
+
+
 # ---------------------------------------------------------------------------- siniestros
 
-@router.post("/claims", status_code=202, tags=["siniestros"])
+@router.post("/claims", status_code=202, tags=["siniestros"], response_model=None)
 async def crear_siniestro(
     request: Request,
     customer_id: Annotated[str, Form()],
@@ -151,13 +220,23 @@ async def crear_siniestro(
     gps_latitude: Annotated[float | None, Form()] = None,
     gps_longitude: Annotated[float | None, Form()] = None,
     imagen: Annotated[UploadFile | None, File()] = None,
-) -> dict[str, Any]:
+):  # type: ignore[no-untyped-def]
     """Registra el siniestro (con foto opcional) y lanza el triaje en segundo plano.
 
     multipart/form-data en vez de JSON: es el único endpoint que recibe un archivo.
     Responde 202 de inmediato con el `run_id`: el dashboard se conecta al stream de
     trazas y ve el trabajo del agente mientras ocurre.
     """
+    # Endpoint público y caro (cada reporte gasta tokens): tope de frecuencia por IP.
+    ip = _ip(request)
+    for limitador, ventana in ((request.app.state.limite_reporte_min, "minuto"),
+                               (request.app.state.limite_reporte_hora, "hora")):
+        espera = limitador.intentar(ip)
+        if espera > 0:
+            log.warning("Reporte rechazado por frecuencia", extra={"ip": ip, "ventana": ventana})
+            return _demasiadas(request, espera,
+                               f"Se alcanzó el máximo de reportes por {ventana}. Intenta de nuevo en un momento.")
+
     gps = None
     if gps_latitude is not None and gps_longitude is not None:
         gps = {"latitude": gps_latitude, "longitude": gps_longitude}
@@ -227,6 +306,7 @@ async def listar_siniestros(
     estado: Annotated[list[str] | None, Query()] = None,
     tipo: str | None = None,
     limite: int = Query(default=50, ge=1, le=200),
+    _: Sesion = TRABAJADOR,
 ) -> dict[str, Any]:
     filas = await _db(request).list_claims(urgency=urgencia, status=estado,
                                            claim_type=tipo, limit=limite)
@@ -234,7 +314,7 @@ async def listar_siniestros(
 
 
 @router.get("/claims/{claim_id}", tags=["siniestros"])
-async def detalle_siniestro(claim_id: UUID, request: Request) -> dict[str, Any]:
+async def detalle_siniestro(claim_id: UUID, request: Request, _: Sesion = TRABAJADOR) -> dict[str, Any]:
     db = _db(request)
     claim = await db.get_claim(claim_id)
     if claim is None:
@@ -249,8 +329,28 @@ async def detalle_siniestro(claim_id: UUID, request: Request) -> dict[str, Any]:
     }
 
 
+@router.get("/public/claims/{claim_id}", tags=["cliente"])
+async def estado_publico(claim_id: UUID, request: Request) -> dict[str, Any]:
+    """Lo único que ve el cliente de su reporte: estado y fechas.
+
+    A propósito NO devuelve urgencia, puntuación, resumen del agente ni trazas: son
+    herramientas internas del equipo, no información para el asegurado.
+    """
+    claim = await _db(request).get_claim(claim_id)
+    if claim is None:
+        raise HTTPException(status_code=404, detail="No encontramos un reporte con ese número.")
+    return {
+        "id": str(claim["id"]),
+        "tipo": claim["claim_type"],
+        "estado": claim["status"],
+        "recibido": _serializa(claim["received_at"]),
+        "actualizado": _serializa(claim["updated_at"]),
+        "en_analisis": claim["urgency_level"] is None,
+    }
+
+
 @router.get("/claims/{claim_id}/image", tags=["siniestros"])
-async def imagen_siniestro(claim_id: UUID, request: Request) -> FileResponse:
+async def imagen_siniestro(claim_id: UUID, request: Request, _: Sesion = TRABAJADOR) -> FileResponse:
     """Devuelve la foto adjunta al reporte, si la hay (la misma que analizó el agente)."""
     adjunto = await _db(request).get_attachment(claim_id)
     if adjunto is None:
@@ -263,12 +363,13 @@ async def imagen_siniestro(claim_id: UUID, request: Request) -> FileResponse:
 
 
 @router.patch("/claims/{claim_id}/status", tags=["siniestros"])
-async def cambiar_estado(claim_id: UUID, payload: StatusIn, request: Request) -> dict[str, Any]:
+async def cambiar_estado(claim_id: UUID, payload: StatusIn, request: Request,
+                         sesion: Sesion = TRABAJADOR) -> dict[str, Any]:
     if payload.estado in {"APPROVED", "REJECTED"} and len((payload.justificacion or "").strip()) < 5:
         raise HTTPException(status_code=400,
                             detail="La justificación es obligatoria (mínimo 5 caracteres) para aprobar o rechazar.")
     claim = await _db(request).update_status(claim_id, payload.estado,
-                                             (payload.justificacion or "").strip() or None, "ajustador")
+                                             (payload.justificacion or "").strip() or None, sesion.usuario)
     if claim is None:
         raise HTTPException(status_code=404, detail="No existe ese siniestro.")
     return {"siniestro": _fila(claim)}
@@ -277,7 +378,7 @@ async def cambiar_estado(claim_id: UUID, payload: StatusIn, request: Request) ->
 # ---------------------------------------------------------------------------- agente
 
 @router.get("/runs/{run_id}", tags=["agente"])
-async def ver_corrida(run_id: UUID, request: Request) -> dict[str, Any]:
+async def ver_corrida(run_id: UUID, request: Request, _: Sesion = PERSONAL) -> dict[str, Any]:
     db = _db(request)
     run = await db.get_run(run_id)
     if run is None:
@@ -286,7 +387,7 @@ async def ver_corrida(run_id: UUID, request: Request) -> dict[str, Any]:
 
 
 @router.get("/runs/{run_id}/stream", tags=["agente"])
-async def stream_corrida(run_id: UUID, request: Request) -> StreamingResponse:
+async def stream_corrida(run_id: UUID, request: Request, _: Sesion = TRABAJADOR) -> StreamingResponse:
     """Trazas en vivo por Server-Sent Events.
 
     Lee los pasos desde la base (no desde memoria): si el navegador se reconecta o se
@@ -315,16 +416,36 @@ async def stream_corrida(run_id: UUID, request: Request) -> StreamingResponse:
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# ---------------------------------------------------------------------------- operación (TI)
+
+@router.get("/admin/stats", tags=["operación"])
+async def admin_stats(request: Request, _: Sesion = SOLO_TI) -> dict[str, Any]:
+    """Cifras agregadas para la vista de TI."""
+    return await _db(request).stats()
+
+
+@router.get("/admin/runs", tags=["operación"])
+async def admin_runs(request: Request, limite: int = Query(default=25, ge=1, le=100),
+                     _: Sesion = SOLO_TI) -> dict[str, Any]:
+    """Últimas corridas del agente, con su consumo, y los últimos eventos anómalos."""
+    db = _db(request)
+    return {
+        "corridas": [_fila(r) for r in await db.list_runs(limite)],
+        "eventos": [_fila(e) for e in await db.recent_errors()],
+    }
+
+
 @router.post("/runs/{run_id}/confirm", tags=["agente"])
-async def confirmar_accion(run_id: UUID, payload: ConfirmIn, request: Request) -> dict[str, Any]:
+async def confirmar_accion(run_id: UUID, payload: ConfirmIn, request: Request,
+                           sesion: Sesion = TRABAJADOR) -> dict[str, Any]:
     """Cuarto límite: una persona aprueba o rechaza la acción con efecto real."""
     agente = _agent(request)
     try:
-        resultado = await agente.resume(run_id, approved=payload.aprobado, by=payload.por)
+        resultado = await agente.resume(run_id, approved=payload.aprobado, by=sesion.usuario)
     except LookupError:
         raise HTTPException(status_code=404, detail="No existe esa corrida del agente.") from None
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
     log.info("Acción confirmada por humano", extra={"run_id": str(run_id), "aprobado": payload.aprobado,
-                                                    "por": payload.por})
+                                                    "por": sesion.usuario})
     return resultado.to_dict()

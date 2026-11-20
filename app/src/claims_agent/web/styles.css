@@ -366,3 +366,161 @@ input[type="file"] { padding: 6px 8px; cursor: pointer; }
   .paso-entra { animation: none; }
   .cursor { animation: none; }
 }
+
+/* =============================================================================
+   Navegación entre vistas y estilos de las vistas de CLIENTE y TI.
+   ============================================================================= */
+
+.nav { display: flex; gap: 0; }
+.nav a {
+  padding: 7px 16px; font-size: 13.5px; color: #B9CACB; text-decoration: none;
+  border: 1px solid #2E4247; border-left-width: 0;
+}
+.nav a:first-child { border-left-width: 1px; }
+.nav a:hover { color: #FFFFFF; background: #243A3F; }
+.nav a[aria-current="page"] { background: var(--instrumento); border-color: var(--instrumento); color: #FFFFFF; font-weight: 600; }
+.nav a:focus-visible { outline-color: #FFFFFF; }
+
+.ver-datos {
+  border: 0; background: none; padding: 0; margin-top: 4px;
+  font-size: 12px; color: var(--instrumento); cursor: pointer; text-decoration: underline;
+}
+.vacio { color: var(--tinta-suave); font-size: 14px; padding: 16px 0; }
+
+/* ---------- vista del cliente ---------- */
+.una-columna { display: block; max-width: 680px; margin: 0 auto; padding: 24px 20px 56px; }
+.tarjeta {
+  background: var(--superficie); border: 1px solid var(--filete);
+  padding: 20px 22px; margin-bottom: 18px;
+}
+.tarjeta h2 { font-size: 18px; margin-bottom: 12px; }
+.tarjeta .lead { font-size: 16px; line-height: 1.5; }
+.tarjeta .nota { margin-top: 12px; font-size: 13.5px; color: var(--tinta-suave); }
+.tarjeta .boton-fantasma { margin-left: 0; }
+
+#seguimiento { border-left: 4px solid var(--instrumento); }
+
+.numero-seguimiento { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.numero-seguimiento span { font-size: 12.5px; color: var(--tinta-suave); }
+.numero-seguimiento code {
+  font: 600 13px var(--mono); background: var(--papel); padding: 5px 9px;
+  border: 1px solid var(--filete); word-break: break-all;
+}
+
+.progreso {
+  list-style: none; margin: 18px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.progreso li {
+  padding: 8px 10px; font-size: 13px; text-align: center; color: var(--tinta-suave);
+  background: var(--papel-hondo); border-bottom: 3px solid var(--filete);
+}
+.progreso li.hecho { color: var(--leve); border-bottom-color: var(--leve); background: var(--leve-fondo); }
+.progreso li.actual { color: #FFFFFF; background: var(--instrumento); border-bottom-color: var(--instrumento); font-weight: 600; }
+.progreso[data-resultado="APPROVED"] li.actual { background: var(--leve); border-bottom-color: var(--leve); }
+.progreso[data-resultado="REJECTED"] li.actual { background: var(--critico); border-bottom-color: var(--critico); }
+
+.demo { margin-top: 14px; font-size: 13px; color: var(--tinta-suave); }
+.demo summary { cursor: pointer; }
+.demo .ejemplos { margin-top: 8px; }
+
+.consulta { display: flex; gap: 10px; align-items: flex-end; }
+.consulta label { flex: 1; }
+.consulta .boton-fantasma { padding: 9px 16px; }
+
+.mis-reportes { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mis-reportes:empty { display: none; }
+.mio {
+  display: flex; gap: 14px; align-items: baseline; width: 100%; text-align: left;
+  padding: 8px 12px; border: 1px solid var(--filete); background: var(--superficie); cursor: pointer;
+}
+.mio:hover { border-color: var(--tinta-suave); }
+.mio-tipo { font-weight: 600; font-size: 13.5px; }
+.mio-id { font: 400 12.5px var(--mono); color: var(--tinta-suave); }
+.mio-fecha { margin-left: auto; font-size: 12.5px; color: var(--tinta-suave); }
+
+/* ---------- vista de TI ---------- */
+.panel-ti { display: block; max-width: 1180px; margin: 0 auto; padding: 24px 28px 56px; }
+.panel-ti section { margin-bottom: 30px; }
+.titulo-seccion { font-size: 15px; color: var(--tinta-suave); margin-bottom: 12px; }
+.titulo-seccion::after { content: ""; display: block; height: 2px; background: var(--tinta); margin-top: 4px; }
+
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.metrica { background: var(--superficie); border: 1px solid var(--filete); padding: 12px 14px; }
+.m-etiqueta { display: block; font-size: 12px; color: var(--tinta-suave); }
+.m-valor { display: block; margin-top: 4px; font: 600 19px/1.25 var(--mono); overflow-wrap: anywhere; }
+.m-valor.nivel-ok { color: var(--leve); }
+.m-valor.nivel-aviso { color: var(--alto); }
+.m-valor.nivel-mal { color: var(--critico); }
+.nota-ti { font-size: 13px; color: var(--tinta-suave); margin-top: 6px; }
+.nota-ti a { color: var(--instrumento); }
+
+.instrumentos-claros {
+  background: var(--superficie); border: 1px solid var(--filete); padding: 12px 0;
+}
+.instrumentos-claros > div { border-left-color: var(--filete); }
+.instrumentos-claros dt { color: var(--tinta-suave); }
+.instrumentos-claros dd { color: var(--tinta); }
+
+.eventos { list-style: none; margin: 0; padding: 0; background: var(--superficie); border: 1px solid var(--filete); }
+.eventos:empty { display: none; }
+.evento {
+  display: grid; grid-template-columns: 76px 1fr auto auto; gap: 12px; align-items: baseline;
+  padding: 8px 14px; border-bottom: 1px dotted var(--filete); font-size: 13.5px;
+}
+.evento:last-child { border-bottom: 0; }
+.evento-tipo { font: 600 11.5px var(--mono); text-transform: uppercase; }
+.evento-error .evento-tipo { color: var(--critico); }
+.evento-fallback .evento-tipo { color: var(--alto); }
+.evento-limit .evento-tipo { color: var(--tinta-suave); }
+.evento-cuerpo { min-width: 0; overflow-wrap: anywhere; }
+.evento-hora { font: 400 12px var(--mono); color: var(--tinta-suave); white-space: nowrap; }
+
+.tabla-envoltura { overflow-x: auto; background: var(--superficie); border: 1px solid var(--filete); }
+.tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabla th {
+  text-align: left; font-size: 12px; font-weight: 600; color: var(--tinta-suave);
+  padding: 9px 12px; border-bottom: 2px solid var(--tinta); white-space: nowrap;
+}
+.tabla td { padding: 8px 12px; border-bottom: 1px dotted var(--filete); white-space: nowrap; }
+.tabla tr:last-child td { border-bottom: 0; }
+.tabla .num { text-align: right; }
+.tabla .mono { font-family: var(--mono); font-size: 12.5px; }
+.vacio-tabla { color: var(--tinta-suave); white-space: normal; padding: 16px 12px; }
+
+.chip { display: inline-block; padding: 1px 8px; font-size: 12px; border: 1px solid var(--filete); background: var(--papel-hondo); }
+.chip-COMPLETED { color: var(--leve); background: var(--leve-fondo); border-color: var(--leve); }
+.chip-FAILED { color: var(--critico); background: var(--critico-fondo); border-color: var(--critico); }
+.chip-LIMIT_REACHED, .chip-AWAITING_CONFIRMATION { color: var(--alto); background: var(--alto-fondo); border-color: var(--alto); }
+
+.traza-ti { margin-top: 18px; }
+.traza-ti .tira-encabezado h3 { font-size: 14px; }
+.traza-ti .boton-fantasma { margin-left: 0; }
+
+@media (max-width: 980px) {
+  .nav { width: 100%; }
+  .nav a { flex: 1; text-align: center; }
+  .panel-ti { padding: 20px 16px 40px; }
+  .evento { grid-template-columns: 1fr; gap: 2px; }
+  .consulta { flex-direction: column; align-items: stretch; }
+}
+
+/* =============================================================================
+   Sesión del personal e ingreso.
+   ============================================================================= */
+.nav { align-items: stretch; }
+.sesion { display: flex; align-items: center; gap: 10px; margin-left: 14px; font: 400 12.5px var(--mono); color: #B9CACB; }
+.boton-salir {
+  border: 1px solid #2E4247; background: none; color: #DCE4E3; padding: 6px 12px;
+  font-size: 13px; cursor: pointer;
+}
+.boton-salir:hover { background: #243A3F; color: #FFFFFF; }
+.sin-margen { margin-left: 0; }
+
+.tarjeta-ingreso { max-width: 420px; margin: 32px auto 0; }
+.tarjeta-ingreso .boton-principal { width: 100%; }
+.tarjeta-ingreso .nota { margin: -4px 0 4px; }
+
+@media (max-width: 980px) {
+  .sesion { margin-left: 0; width: 100%; justify-content: space-between; padding-top: 8px; }
+}

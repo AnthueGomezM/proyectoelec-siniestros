@@ -72,7 +72,8 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException):  # type: ignore[no-untyped-def]
-        titulos = {404: "No encontrado", 405: "Método no permitido", 409: "Conflicto"}
+        titulos = {401: "No autenticado", 403: "Sin permiso", 404: "No encontrado",
+                   405: "Método no permitido", 409: "Conflicto", 429: "Demasiadas solicitudes"}
         return problem(exc.status_code, titulos.get(exc.status_code, "Error"),
                        str(exc.detail), request=request)
 

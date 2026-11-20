@@ -71,6 +71,9 @@ class FakeDB:
     async def get_steps(self, run_id, after_idx: int = -1):  # type: ignore[no-untyped-def]
         return [s for s in self.steps.get(run_id, []) if s["idx"] > after_idx]
 
+    async def tokens_last_24h(self):  # type: ignore[no-untyped-def]
+        return getattr(self, "tokens_24h", 0)
+
     async def get_claim(self, claim_id):  # type: ignore[no-untyped-def]
         return {"id": claim_id, "customer_id": "CUST-000123", "claim_type": "AUTO",
                 "description": "Choque con heridos y ambulancia en la autopista"}

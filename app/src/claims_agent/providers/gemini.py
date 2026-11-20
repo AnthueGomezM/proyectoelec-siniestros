@@ -158,7 +158,10 @@ class GeminiProvider(LLMProvider):
             text="\n".join(texts).strip() or None,
             tool_calls=tuple(calls),
             tokens_in=int(usage.get("promptTokenCount") or 0),
-            tokens_out=int(usage.get("candidatesTokenCount") or 0),
+            # Gemini 3 "piensa" antes de responder y esos tokens (thoughtsTokenCount) se
+            # descuentan de la cuota aunque no aparezcan en el texto: se suman para que el
+            # tope por corrida y el techo diario midan el consumo real.
+            tokens_out=int(usage.get("candidatesTokenCount") or 0) + int(usage.get("thoughtsTokenCount") or 0),
             model=self._model,
             raw_finish_reason=candidate.get("finishReason"),
         )

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Guardia de triaje · Siniestros</title>
+<title>Guardia de triaje · Trabajador</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -12,7 +12,6 @@
 </head>
 <body>
 
-<!-- Barra de instrumentos: qué motor está operando y con qué límites -->
 <header class="guardia">
   <div class="guardia-identidad">
     <svg class="marca" viewBox="0 0 32 32" aria-hidden="true">
@@ -22,17 +21,15 @@
     </svg>
     <div>
       <h1>Guardia de triaje</h1>
-      <p id="turno">Siniestros en cola, ordenados por urgencia</p>
+      <p>Siniestros en cola, ordenados por urgencia</p>
     </div>
   </div>
-
-  <dl class="instrumentos" id="instrumentos">
-    <div><dt>Motor</dt><dd id="i-motor">cargando…</dd></div>
-    <div><dt>Iteraciones</dt><dd id="i-iter">—</dd></div>
-    <div><dt>Tiempo</dt><dd id="i-tiempo">—</dd></div>
-    <div><dt>Tokens</dt><dd id="i-tokens">—</dd></div>
-    <div><dt>Confirmación</dt><dd id="i-confirm">—</dd></div>
-  </dl>
+  <nav class="nav" aria-label="Vistas">
+    <a href="/">Cliente</a>
+    <a href="/trabajador" aria-current="page">Trabajador</a>
+    <a href="/ti">TI</a>
+    <span class="sesion"><span id="usuarioActual"></span><button type="button" class="boton-salir" id="salir">Salir</button></span>
+  </nav>
 </header>
 
 <!-- Aviso de degradación: el agente siguió operando sin el modelo -->
@@ -54,48 +51,11 @@
         <button type="button" data-urgencia="LOW" aria-pressed="false">Leves</button>
       </div>
       <button type="button" class="boton-fantasma" id="verResueltos" aria-pressed="false">Ver resueltos</button>
-      <button type="button" class="boton-fantasma" id="recargar" style="margin-left:0">Actualizar</button>
+      <button type="button" class="boton-fantasma sin-margen" id="recargar">Actualizar</button>
     </div>
 
     <ol class="fichas" id="fichas"></ol>
-    <p class="vacio" id="vacio" hidden>No hay siniestros en la cola. Reporta uno abajo y el agente lo tría en vivo.</p>
-
-    <!-- Reporte: alimenta la demo en vivo -->
-    <section class="reportar" aria-labelledby="h-reportar">
-      <h2 id="h-reportar">Reportar siniestro</h2>
-      <form id="formulario" novalidate>
-        <div class="campos">
-          <label>Cliente
-            <input name="customer_id" value="CUST-000123" required pattern="[A-Za-z0-9_-]{3,64}" spellcheck="false">
-          </label>
-          <label>Tipo
-            <select name="claim_type">
-              <option value="AUTO">Auto</option>
-              <option value="MEDICAL">Médico</option>
-              <option value="HOME">Hogar</option>
-            </select>
-          </label>
-        </div>
-        <label class="ancho">Relato del cliente
-          <textarea name="description" rows="3" required minlength="10" maxlength="5000"
-            placeholder="Transcribe lo que dijo el cliente, sin corregir ni resumir.">Choque en la autopista norte, hay dos heridos y ya llamamos a la ambulancia. El carro quedó completamente destruido.</textarea>
-        </label>
-        <label class="ancho">Foto del daño (opcional)
-          <input type="file" name="imagen" id="imagenInput" accept="image/jpeg,image/png,image/webp">
-        </label>
-        <img id="previsualizacion" class="previsualizacion" alt="Previsualización de la foto adjunta" hidden>
-        <div class="ejemplos">
-          <span>Casos de prueba:</span>
-          <button type="button" data-caso="critico">Crítico</button>
-          <button type="button" data-caso="inconsistente">Inconsistente</button>
-          <button type="button" data-caso="leve">Leve</button>
-          <button type="button" data-caso="poliza">Póliza vencida</button>
-          <button type="button" data-caso="invalido">Inválido (error 400)</button>
-        </div>
-        <p class="error-formulario" id="errorFormulario" hidden></p>
-        <button type="submit" class="boton-principal" id="enviar">Reportar y triar</button>
-      </form>
-    </section>
+    <p class="vacio" id="vacio" hidden>No hay siniestros pendientes. Cuando un cliente reporte uno, aparecerá aquí.</p>
   </section>
 
   <!-- EXPEDIENTE + TIRA DE REGISTRO -------------------------------------- -->
@@ -106,7 +66,7 @@
     </div>
 
     <div class="sin-seleccion" id="sinSeleccion">
-      <p>Selecciona un siniestro de la cola, o reporta uno nuevo, para ver qué hizo el agente paso a paso.</p>
+      <p>Selecciona un siniestro de la cola para ver qué hizo el agente paso a paso y decidir.</p>
     </div>
 
     <article class="detalle" id="detalle" hidden>
@@ -168,6 +128,7 @@
 </main>
 
 <div class="brindis" id="brindis" role="status" hidden></div>
-<script src="/static/app.js"></script>
+<script src="/static/comun.js"></script>
+<script src="/static/trabajador.js"></script>
 </body>
 </html>
