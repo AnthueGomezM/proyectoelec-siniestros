@@ -34,11 +34,17 @@ WEB_DIR = Path(__file__).parent / "web"
 
 #: ruta -> (archivo, roles que pueden abrirla; None = pública).
 #: El cliente vive en la raíz porque es quien llega sin saber nada del sistema.
+#:
+#: Es una aplicación de una sola página: las cuatro rutas sirven la MISMA página contenedor y el
+#: enrutado entre vistas lo hace el navegador sin recargar. El control de acceso sigue siendo del
+#: servidor: sin sesión del rol correcto, /trabajador y /ti redirigen al ingreso (303) y ni
+#: siquiera entregan la página; y la API valida el rol en cada llamada.
+PAGINA = "index.html"
 PAGINAS: dict[str, tuple[str, tuple[str, ...] | None]] = {
-    "/": ("cliente.html", None),
-    "/ingresar": ("ingresar.html", None),
-    "/trabajador": ("trabajador.html", ("trabajador",)),
-    "/ti": ("ti.html", ("ti",)),
+    "/": (PAGINA, None),
+    "/ingresar": (PAGINA, None),
+    "/trabajador": (PAGINA, ("trabajador",)),
+    "/ti": (PAGINA, ("ti",)),
 }
 
 #: Política de contenido: solo se ejecuta JavaScript propio, sin scripts ni estilos en línea.

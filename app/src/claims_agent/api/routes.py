@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -25,6 +26,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from claims_agent.agent.loop import STATUS_AWAITING, TriageAgent
 from claims_agent.api.errors import problem
 from claims_agent.auth import COOKIE, Sesion, requiere
+from claims_agent.events import SOLAPE, construir_eventos
 from claims_agent.storage import ImageRejected, save_image
 
 log = logging.getLogger(__name__)
@@ -201,6 +203,15 @@ async def iniciar_sesion(payload: LoginIn, request: Request, response: Response)
 async def cerrar_sesion(response: Response) -> dict[str, str]:
     response.delete_cookie(COOKIE, path="/")
     return {"estado": "sesión cerrada"}
+
+
+@router.get("/auth/sesion", tags=["acceso"])
+async def estado_de_sesion(request: Request) -> dict[str, Any]:
+    """¿Hay una sesión activa? Responde 200 siempre: así la aplicación consulta sin generar un 401."""
+    sesion = request.app.state.auth.leer(request)
+    if sesion is None:
+        return {"autenticado": False}
+    return {"autenticado": True, "usuario": sesion.usuario, "rol": sesion.rol}
 
 
 @router.get("/auth/me", tags=["acceso"])
@@ -433,6 +444,37 @@ async def admin_runs(request: Request, limite: int = Query(default=25, ge=1, le=
         "corridas": [_fila(r) for r in await db.list_runs(limite)],
         "eventos": [_fila(e) for e in await db.recent_errors()],
     }
+
+
+@router.get("/events", tags=["agente"])
+async def avisos_en_vivo(request: Request, _: Sesion = TRABAJADOR) -> StreamingResponse:
+    """Avisos en vivo para el trabajador (Server-Sent Events).
+
+    Empuja solo lo que ocurre DESPUÉS de conectarse; al reconectar (el navegador lo hace solo) la
+    pantalla vuelve a cargar la cola completa, así que un corte breve no pierde nada.
+    """
+    db = _db(request)
+
+    async def eventos():  # type: ignore[no-untyped-def]
+        cursor = await db.now()
+        vistos: set[tuple] = set()
+        ultimo_latido = time.monotonic()
+        yield "retry: 3000\n\nevent: listo\ndata: {}\n\n"
+        while True:
+            if await request.is_disconnected():
+                return
+            datos = await db.events_since(cursor - SOLAPE)
+            nuevos, cursor = construir_eventos(datos, vistos, cursor)
+            for e in nuevos:
+                yield f"event: {e['tipo']}\ndata: {json.dumps(e, ensure_ascii=False)}\n\n"
+                ultimo_latido = time.monotonic()
+            if time.monotonic() - ultimo_latido > 15:      # mantiene viva la conexión tras proxies
+                yield ": latido\n\n"
+                ultimo_latido = time.monotonic()
+            await asyncio.sleep(2)
+
+    return StreamingResponse(eventos(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/runs/{run_id}/confirm", tags=["agente"])

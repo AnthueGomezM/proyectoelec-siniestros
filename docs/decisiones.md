@@ -410,3 +410,57 @@ todas las que quedan (foto, similares y asignar), y cierra con una segunda.
   que ni `agent_runs` ni el techo diario ven esos tokens. Es el siguiente hueco de medición.
 - No se probó `GEMINI_THINKING_LEVEL=minimal`, que podría bajar también la latencia.
 
+---
+
+## 13. Interfaz de usuario
+
+**Decisión: framework ligero SIN compilación (Preact + htm).** La interfaz pasó de tres páginas con
+JavaScript manipulando el DOM a mano (~1.100 líneas) a una aplicación de una sola página con
+componentes. Se eligió Preact + htm en un único archivo local (`web/vendor/htm-preact.js`, 13 KB)
+frente a React + Vite porque:
+
+| Criterio | Preact + htm (elegido) | React + Vite |
+|---|---|---|
+| Arranque con un comando, sin internet para el JS | Sí: sin Node ni etapa de build en Docker | Exige una etapa de build con Node y `npm install` |
+| Política de contenido `script-src 'self'` | Se cumple: el archivo se sirve del mismo origen | Se cumple (el bundle también) |
+| Componentes, estado y hooks | Sí (API de React) | Sí |
+| Costo | 13 KB, sin cadena de herramientas | Más peso y más piezas que mantener |
+
+El costo asumido: sin TypeScript ni empaquetado, y sin las herramientas del ecosistema de React. Si el
+proyecto creciera mucho, la migración sería natural porque los componentes usan la misma API.
+
+**Estructura.** `web/index.html` (una sola página contenedor para las cuatro rutas) + `web/app/`:
+`main.js` (sesión, enrutado y estructura), `router.js` (History API, sin recargar), `views/` (Cliente,
+Ingreso, Trabajador, Ti), `ui.js` (componentes), `live.js` (avisos en vivo), `tira.js`, `api.js` y un
+sistema de diseño en `styles.css` (variables CSS, modo oscuro, responsivo).
+
+**El control de acceso NO se movió al navegador.** Las cuatro rutas sirven la misma página, pero el
+servidor sigue sin entregar `/trabajador` ni `/ti` sin la sesión del rol correcto (303 al ingreso) y la
+API valida el rol en cada llamada. La interfaz solo decide qué mostrar.
+
+**Avisos en vivo.** `GET /api/events` (SSE, rol trabajador) consulta la base cada 2 s y empuja solo lo
+nuevo: `nuevo`, `triaje` (con la urgencia), `aprobacion` y `estado`. Se lee de la base y no de memoria,
+igual que el stream de trazas, así funciona con varios procesos. El cursor usa el reloj de la base y
+retrocede 2 s con deduplicación para no perder filas. El navegador reconecta solo; al volver, la cola se
+recarga completa, así que un corte breve no la deja desactualizada. Si la conexión en vivo está caída,
+la cola se consulta cada 15 s como respaldo.
+
+**Diseño responsivo.** Escritorio: menú lateral + cola y expediente lado a lado. Tableta: igual con
+columnas más estrechas. Móvil (≤ 900 px): barra de navegación inferior y una sola columna visible a la
+vez (cola o expediente, con botón Volver); las tablas de TI pasan a tarjetas. Respeta el modo oscuro del
+sistema, `prefers-reduced-motion` y las áreas seguras de los móviles con muesca.
+
+**Cómo se verificó.** Además de las pruebas unitarias, se recorrió la aplicación en Chrome sin interfaz
+(protocolo CDP) sobre una copia aislada con datos de ejemplo: 34 comprobaciones en escritorio, tableta y
+móvil, en modo claro y oscuro, incluyendo que un siniestro creado desde fuera aparece solo en la cola con
+su aviso crítico. Ese recorrido encontró y permitió corregir dos defectos que las pruebas unitarias no
+ven (fichas con la fila inferior recortada y un panel que desbordaba la ventana por el ancho de una tabla).
+El script de ese recorrido no forma parte del repositorio.
+
+**Límites asumidos.**
+- No se probó en Safari ni en Firefox, ni en dispositivos físicos; solo en Chrome (emulación de móvil).
+- Las notificaciones del sistema en móviles suelen exigir un service worker; aquí no hay, así que en
+  móvil funcionan el aviso emergente en pantalla y el sonido, pero no la notificación del sistema.
+- No hay pruebas automáticas del JavaScript (hay comprobaciones estáticas de seguridad y el recorrido manual).
+- Las tipografías vienen de Google Fonts; sin internet se usan las del sistema.
+- No se revisó con un lector de pantalla; sí hay etiquetas, roles ARIA, foco visible y contraste cuidado.

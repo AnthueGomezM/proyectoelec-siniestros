@@ -389,6 +389,50 @@ class Database:
             "corridas": {k: int(v) for k, v in corridas.items()},
         }
 
+    # ------------------------------------------------------------------ avisos en vivo
+
+    async def now(self) -> datetime:
+        """Hora de la base de datos: el cursor de los eventos usa SU reloj, no el de la aplicación."""
+        async with self._pool.connection() as conn:
+            cur = await conn.execute("SELECT now() AS t")
+            row = await cur.fetchone()
+        return row["t"]  # type: ignore[index]
+
+    async def events_since(self, since: datetime) -> dict[str, list[dict[str, Any]]]:
+        """Lo que cambió desde `since`, para el canal de avisos del trabajador.
+
+        Cuatro consultas pequeñas e indexadas por fecha; se lee de la base (no de memoria) para
+        que funcione igual con varios procesos y sobreviva a reinicios, como el stream de trazas.
+        """
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                """SELECT id AS claim_id, customer_id, claim_type, received_at AS momento
+                   FROM claims WHERE received_at > %s ORDER BY received_at""", (since,))
+            nuevos = [dict(r) for r in await cur.fetchall()]
+
+            cur = await conn.execute(
+                """SELECT a.claim_id, c.customer_id, c.claim_type, a.urgency_level,
+                          a.inconsistencies_flag, a.assessed_at AS momento
+                   FROM claim_assessments a JOIN claims c ON c.id = a.claim_id
+                   WHERE a.assessed_at > %s ORDER BY a.assessed_at""", (since,))
+            triajes = [dict(r) for r in await cur.fetchall()]
+
+            cur = await conn.execute(
+                """SELECT r.id AS run_id, r.claim_id, c.customer_id, c.claim_type,
+                          r.finished_at AS momento
+                   FROM agent_runs r JOIN claims c ON c.id = r.claim_id
+                   WHERE r.status = 'AWAITING_CONFIRMATION' AND r.finished_at > %s
+                   ORDER BY r.finished_at""", (since,))
+            aprobaciones = [dict(r) for r in await cur.fetchall()]
+
+            # updated_at > received_at: solo cambios reales (el valor inicial es igual a received_at).
+            cur = await conn.execute(
+                """SELECT id AS claim_id, customer_id, claim_type, status, updated_at AS momento
+                   FROM claims WHERE updated_at > %s AND updated_at > received_at
+                   ORDER BY updated_at""", (since,))
+            estados = [dict(r) for r in await cur.fetchall()]
+        return {"nuevo": nuevos, "triaje": triajes, "aprobacion": aprobaciones, "estado": estados}
+
     async def tokens_last_24h(self) -> int:
         """Tokens gastados por el agente en las últimas 24 h (base del techo diario)."""
         async with self._pool.connection() as conn:

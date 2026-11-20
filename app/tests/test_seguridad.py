@@ -229,6 +229,13 @@ def test_una_cookie_falsificada_no_abre_nada(cliente_http):
     assert cliente_http.get("/ti").status_code == 303
 
 
+def test_el_estado_de_sesion_responde_200_sin_sesion_y_con_ella(cliente_http):
+    """La aplicación lo consulta al abrir: no debe producir un 401 (ruido en la consola del navegador)."""
+    assert cliente_http.get("/api/auth/sesion").json() == {"autenticado": False}
+    _entrar(cliente_http, "ana", CLAVE_TRABAJADOR)
+    assert cliente_http.get("/api/auth/sesion").json() == {"autenticado": True, "usuario": "ana", "rol": "trabajador"}
+
+
 def test_cerrar_sesion(cliente_http):
     _entrar(cliente_http, "ana", CLAVE_TRABAJADOR)
     cliente_http.post("/api/auth/logout")
@@ -280,6 +287,54 @@ def test_ninguna_pagina_usa_scripts_ni_estilos_en_linea():
         assert not re.search(r"<script(?![^>]*\bsrc=)", texto), f"{html.name}: script en línea"
         assert " style=" not in texto, f"{html.name}: estilo en línea"
         assert not re.search(r"\son\w+=", texto), f"{html.name}: manejador de evento en línea"
+
+
+def test_el_javascript_de_la_aplicacion_no_inyecta_html_ni_ejecuta_texto():
+    """Los relatos los escribe un cliente: la interfaz solo los inserta como TEXTO (Preact escapa).
+
+    Estas construcciones son las que convertirían un relato malicioso en HTML o código ejecutable.
+    """
+    import re
+    from pathlib import Path
+    app = Path(__file__).parent.parent / "src" / "claims_agent" / "web" / "app"
+    prohibido = {
+        r"innerHTML": "innerHTML",
+        r"outerHTML": "outerHTML",
+        r"insertAdjacentHTML": "insertAdjacentHTML",
+        r"dangerouslySetInnerHTML": "dangerouslySetInnerHTML",
+        r"document\.write": "document.write",
+        r"\beval\s*\(": "eval()",
+        r"new\s+Function\s*\(": "new Function()",
+        r"setAttribute\(\s*[\"']style": "setAttribute('style')",
+        r"""style\s*=\s*["']""": "estilo en línea",
+    }
+    archivos = list(app.rglob("*.js"))
+    assert len(archivos) >= 10                                   # que de verdad se esté revisando algo
+    for archivo in archivos:
+        texto = archivo.read_text(encoding="utf-8")
+        for patron, nombre in prohibido.items():
+            assert not re.search(patron, texto), f"{archivo.name}: usa {nombre}"
+
+
+def test_la_aplicacion_es_de_pagina_unica_y_el_acceso_lo_decide_el_servidor(cliente_http):
+    """Las cuatro rutas entregan la misma página contenedor; el navegador hace el enrutado interno."""
+    cuerpo_inicio = cliente_http.get("/").text
+    assert 'type="module"' in cuerpo_inicio and "/static/app/main.js" in cuerpo_inicio
+    assert cliente_http.get("/ingresar").text == cuerpo_inicio
+    # Pero el servidor NO entrega la página del personal sin la sesión del rol correcto.
+    assert cliente_http.get("/trabajador").status_code == 303
+    cliente_http.post("/api/auth/login", json={"usuario": "ana", "clave": CLAVE_TRABAJADOR})
+    assert cliente_http.get("/trabajador").text == cuerpo_inicio
+    assert cliente_http.get("/ti").status_code == 303            # ni siquiera con sesión de otro rol
+
+
+def test_los_archivos_del_framework_se_sirven_localmente_con_su_tipo_correcto(cliente_http):
+    """Sin CDN: la política de contenido solo permite scripts del propio origen."""
+    for ruta in ("/static/app/main.js", "/static/vendor/htm-preact.js", "/static/styles.css"):
+        r = cliente_http.get(ruta)
+        assert r.status_code == 200, ruta
+    assert "javascript" in cliente_http.get("/static/app/main.js").headers["content-type"]
+    assert "cdn" not in cliente_http.get("/").text.lower()
 
 
 # =============================================================================

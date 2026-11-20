@@ -56,9 +56,16 @@ Cuando termine verás:
 ✓ API (docs):  http://localhost:8000/api/docs
 ```
 
-La interfaz tiene tres vistas: el **cliente** (reporta y consulta el estado, sin cuenta),
-el **trabajador** (cola, expediente, aprobación al agente) y **TI** (salud, límites y
-consumo). Las dos últimas exigen inicio de sesión; ver la sección *Seguridad*.
+La interfaz es una aplicación de una sola página con tres vistas: el **cliente** (reporta y
+consulta el estado, sin cuenta), el **trabajador** (cola, expediente, aprobación al agente) y
+**TI** (salud, límites y consumo). Es responsiva (escritorio, tableta y móvil, con modo oscuro) y
+las dos últimas exigen inicio de sesión; ver la sección *Seguridad*.
+
+**Avisos en vivo para el trabajador.** Mientras tiene abierta la cola, el servidor le avisa al
+instante (Server-Sent Events, `GET /api/events`): llega un siniestro nuevo, el agente lo clasifica
+(con un aviso y sonido más fuerte si es crítico) o necesita su autorización. La ficha aparece sola,
+sin recargar, y desde la campana de la barra superior se activan el sonido y las notificaciones del
+sistema (las del sistema solo suenan con la pestaña en segundo plano).
 
 **Sin clave de Gemini también arranca.** `run.sh` lo detecta y levanta en modo
 determinista (`LLM_PROVIDER=offline`): el triaje funciona con reglas, sin llamadas
@@ -136,7 +143,9 @@ app/
       lexicon.py           diccionario de urgencia con pesos (editable sin tocar código)
       classifier.py        clasificador determinista
     api/                   endpoints, SSE de trazas, manejo de errores
-    web/                   tres vistas sin dependencias: cliente (/), trabajador (/trabajador), TI (/ti)
+    web/                   aplicación de una sola página (Preact + htm local, sin build): cliente (/),
+                           trabajador (/trabajador) y TI (/ti); vendor/ trae el framework con su licencia
+    events.py              avisos en vivo: de filas de la base a eventos para el trabajador
   tests/                   85 pruebas unitarias
 eval/
   casos_dorados.jsonl      22 casos con la urgencia que esperaría un ajustador
@@ -216,7 +225,9 @@ asumidos en `docs/decisiones.md` § 11. En corto:
 - **Gasto acotado.** Además de los cuatro límites por corrida: tope de reportes por IP,
   tope de intentos de login y un techo diario de tokens (`LLM_DAILY_TOKEN_BUDGET`); superado,
   los triajes siguen en modo determinista.
-- **Cabeceras y CSP** que impiden ejecutar scripts que no sean los propios.
+- **Cabeceras y CSP** que impiden ejecutar scripts que no sean los propios. El framework de la
+  interfaz se sirve desde este mismo origen (no desde un CDN) y la interfaz solo inserta texto de
+  los clientes, nunca HTML: hay pruebas que fallan si alguien introduce `innerHTML` o estilos en línea.
 
 > **Si ya tenías el sistema levantado:** añade `AUTH_USERS` a tu `.env` (ver `.env.example`)
 > y corre `./run.sh`; aplica el rol del agente en tu base existente sin borrar datos.
