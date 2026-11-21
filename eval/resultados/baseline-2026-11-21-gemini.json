@@ -1,0 +1,470 @@
+{
+  "resumen": {
+    "fecha": "2026-11-21 15:33 UTC",
+    "proveedor": "gemini",
+    "modelo": "gemini-3.5-flash",
+    "casos": 22,
+    "corridas_sin_error": 22,
+    "exactitud_urgencia_pct": 100.0,
+    "deteccion_inconsistencias_pct": 100.0,
+    "latencia_mediana_s": 45.071,
+    "tokens_mediana": 1310,
+    "latencia_p90_s": 45.186,
+    "tokens_total": 32981,
+    "inconsistencias_esperadas": 5,
+    "inconsistencias_detectadas": 5,
+    "inconsistencias_falsos_positivos": 1,
+    "casos_borde": 7,
+    "casos_borde_ok": 7,
+    "herramientas_por_caso": 0.68,
+    "corridas_degradadas": 16
+  },
+  "casos": [
+    {
+      "id": "TC-001",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.211,
+      "tokens": 1308,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-002",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.15,
+      "tokens": 678,
+      "iteraciones": 2,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: rayon. Póliza activa con deducible de $ 800.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-003",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 29.285,
+      "tokens": 1825,
+      "iteraciones": 1,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-004",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.069,
+      "tokens": 1334,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje HIGH: Validación humana en máximo 2 horas. Términos que determinan la urgencia: robaron. Póliza activa con deducible de $ 850.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-005",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "SEVERITY_CONTRADICTION"
+      ],
+      "inconsistencias_obtenidas": [
+        "SEVERITY_CONTRADICTION"
+      ],
+      "latencia_s": 23.493,
+      "tokens": 3875,
+      "iteraciones": 2,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "El siniestro reportado para el vehículo cubierto bajo la póliza de AUTO activa de CUST-009034 presenta una urgencia clasificada como HIGH debido a una inconsistencia explícita en el relato, donde el cliente califica el suceso como \"daño leve\" pero menciona un vuelco y \"PÉRDIDA TOTAL\". Dado que el ex"
+    },
+    {
+      "id": "TC-006",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 8.681,
+      "tokens": 1808,
+      "iteraciones": 1,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "Este siniestro de vehículo asegurado bajo la póliza activa del cliente CUST-005501 ha sido clasificado con nivel de urgencia LOW, correspondiente a un incidente menor por llanta reventada y rin rayado sin lesionados ni inconsistencias detectadas. La póliza se encuentra vigente (2026-07-01 a 2027-06-"
+    },
+    {
+      "id": "TC-007",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.064,
+      "tokens": 1310,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-008",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.142,
+      "tokens": 1302,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-009",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 41.629,
+      "tokens": 3926,
+      "iteraciones": 2,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": true,
+      "resumen": "El siniestro reportado por el cliente CUST-006612 corresponde a una urgencia médica clasificada como HIGH debido a una fractura de tobillo que requiere intervención quirúrgica. La póliza de salud vinculada se encuentra activa y vigente con una cobertura de $90.000.000 COP y un deducible de $250.000 "
+    },
+    {
+      "id": "TC-010",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.064,
+      "tokens": 660,
+      "iteraciones": 2,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Póliza activa con deducible de $ 300.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-011",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.201,
+      "tokens": 1302,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-012",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 18.928,
+      "tokens": 1855,
+      "iteraciones": 1,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": false,
+      "borde": false,
+      "resumen": "El siniestro médico presentado por el cliente CUST-004567 ha sido clasificado con una urgencia LOW, indicando un proceso de revisión manual estándar sin lesiones graves reportadas. Sin embargo, al verificar la póliza de salud correspondiente, se identificó que esta no se encuentra vigente para la fe"
+    },
+    {
+      "id": "TC-013",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "inconsistencias_obtenidas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "latencia_s": 45.072,
+      "tokens": 1362,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje HIGH: Revisión manual. Términos que determinan la urgencia: destruido. Inconsistencia detectada: El tipo declarado no corresponde al relato. ATENCIÓN: la póliza está en estado LAPSED; la cobertura debe validarse con suscripción. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-014",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 20.324,
+      "tokens": 1821,
+      "iteraciones": 1,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": false,
+      "borde": true,
+      "resumen": ""
+    },
+    {
+      "id": "TC-015",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.069,
+      "tokens": 1300,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-016",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.165,
+      "tokens": 671,
+      "iteraciones": 2,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: gotera. Póliza activa con deducible de $ 1.100.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-017",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.186,
+      "tokens": 1310,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-018",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "HIGH",
+      "urgencia_obtenida": "HIGH",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [
+        "DAMAGE_DENIED_BUT_SEVERE"
+      ],
+      "latencia_s": 45.181,
+      "tokens": 1335,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": true,
+      "resumen": "Triaje HIGH: Revisión manual. Términos que determinan la urgencia: quemó. Inconsistencia detectada: Niega daños pero describe daños graves. Póliza activa con deducible de $ 1.200.000. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-019",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "inconsistencias_obtenidas": [
+        "CLAIM_TYPE_MISMATCH"
+      ],
+      "latencia_s": 45.149,
+      "tokens": 689,
+      "iteraciones": 2,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": false,
+      "resumen": "Triaje LOW: Revisión manual. Inconsistencia detectada: El tipo declarado no corresponde al relato. ATENCIÓN: la póliza está en estado CANCELLED; la cobertura debe validarse con suscripción. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    },
+    {
+      "id": "TC-020",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 1.718,
+      "tokens": 1304,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-021",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "CRITICAL",
+      "urgencia_obtenida": "CRITICAL",
+      "acierto": true,
+      "inconsistencias_esperadas": [
+        "DAMAGE_DENIED_BUT_SEVERE",
+        "INJURY_DENIED_BUT_EVIDENCE"
+      ],
+      "inconsistencias_obtenidas": [
+        "DAMAGE_DENIED_BUT_SEVERE",
+        "INJURY_DENIED_BUT_EVIDENCE"
+      ],
+      "latencia_s": 46.226,
+      "tokens": 1318,
+      "iteraciones": 3,
+      "herramientas": [
+        "buscar_siniestros_similares"
+      ],
+      "estado": "AWAITING_CONFIRMATION",
+      "degradado": true,
+      "borde": false,
+      "resumen": ""
+    },
+    {
+      "id": "TC-022",
+      "ok": true,
+      "error": null,
+      "urgencia_esperada": "LOW",
+      "urgencia_obtenida": "LOW",
+      "acierto": true,
+      "inconsistencias_esperadas": [],
+      "inconsistencias_obtenidas": [],
+      "latencia_s": 45.171,
+      "tokens": 688,
+      "iteraciones": 2,
+      "herramientas": [],
+      "estado": "COMPLETED",
+      "degradado": true,
+      "borde": true,
+      "resumen": "Triaje LOW: Aprobación automática. Términos que determinan la urgencia: abolladura. ATENCIÓN: no existe póliza para el cliente reportado; verificar identificación antes de continuar. Resumen generado en modo determinista (sin modelo de lenguaje)."
+    }
+  ]
+}

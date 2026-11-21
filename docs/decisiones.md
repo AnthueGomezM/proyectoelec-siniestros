@@ -464,3 +464,55 @@ El script de ese recorrido no forma parte del repositorio.
 - No hay pruebas automáticas del JavaScript (hay comprobaciones estáticas de seguridad y el recorrido manual).
 - Las tipografías vienen de Google Fonts; sin internet se usan las del sistema.
 - No se revisó con un lector de pantalla; sí hay etiquetas, roles ARIA, foco visible y contraste cuidado.
+
+---
+
+## 14. Cifras finales contra la línea base (Momento 3)
+
+Medido el **2026-11-21** con la aplicación y PostgreSQL levantados (`docker compose exec app python
+/app/eval/run_eval.py --provider offline|gemini`), mismos 22 casos dorados, medianas.
+Línea base de referencia: **semana 10, 2026-10-23** (§ 8).
+
+| Cifra | Línea base 2026-10-23 (offline) | Final offline 2026-11-21 | Final Gemini 2026-11-21 (**no válida**, ver abajo) |
+|---|---|---|---|
+| Exactitud de urgencia | 100,0 % (22/22) | 100,0 % (22/22) | 100,0 % (22/22) |
+| Detección de inconsistencias | 100,0 % (5/5, 1 falso positivo) | 100,0 % (5/5, 1 falso positivo) | 100,0 % (5/5, 1 falso positivo) |
+| Latencia por caso | 0,009 s | 0,010 s | 45,07 s |
+| Tokens por caso | 1.866 | **1.305** | 1.310 |
+
+**Qué cambió y por qué.**
+- *Exactitud e inconsistencias: sin cambio*, como se esperaba: el clasificador determinista no se
+  modificó, y es él quien fija la urgencia aunque el modelo opine otra cosa.
+- *Latencia: igual* (0,009 → 0,010 s, ruido de medición).
+- *Tokens: 1.866 → 1.305 (-30 %)*. Es la optimización del § 12: `clasificar_urgencia` y
+  `consultar_poliza` se ejecutan antes del modelo y ya no se declaran, así que el conteo estimado
+  por caso baja (de 2,68 a 0,68 herramientas por caso). En el motor offline son tokens **contados, no
+  facturados**.
+
+**La corrida con Gemini NO es una medición del modelo.** 16 de las 22 corridas salieron
+`degradadas`: Gemini agotó los 45 s de la corrida (`ProviderTimeout`) y el agente terminó con el
+motor determinista. La mediana de latencia (45,07 s) es literalmente el límite de tiempo, no la
+velocidad del modelo, y los 1.310 tokens medianos son en su mayoría del motor de respaldo. Solo
+6 casos completaron con el modelo (TC-003, 005, 006, 009, 012, 014 y TC-020 en 1,7 s), con 1.800-3.900
+tokens. Lo único que prueba esta corrida es que **la degradación funciona**: 22/22 casos terminaron
+con la urgencia correcta aun con el proveedor caído. El mismo `ProviderTimeout` apareció en las
+corridas del ataque de inyección (`seguridad.md` § 3) y en el caso leve del § 12: es un patrón del
+proveedor (capa gratuita o modelo con latencia alta), no un hecho aislado.
+
+**Pendiente:** repetir `--provider gemini` cuando el proveedor responda (`./run.sh check` mide la
+latencia de una llamada) o subiendo `AGENT_TIMEOUT_SECONDS`/`LLM_TIMEOUT_SECONDS`, y entonces
+reemplazar la última columna. Hasta entonces no se cita ninguna cifra de Gemini.
+
+Archivos: [`baseline-2026-11-21-offline.md`](../eval/resultados/baseline-2026-11-21-offline.md),
+[`baseline-2026-11-21-gemini.md`](../eval/resultados/baseline-2026-11-21-gemini.md).
+
+Otras mediciones posteriores a la línea base:
+
+| Qué | Antes | Después | Fecha / método |
+|---|---|---|---|
+| Pruebas automáticas | 69 | **141 en verde** | 2026-11-21, `pytest` |
+| Tokens por triaje con Gemini real | ~9.200 (promedio de 5) | ~4.700 (2 casos, muestra pequeña) | § 12 |
+| Ataque de inyección | no probado | 0 acciones sin humano, urgencia intacta (modelo obediente simulado) | `seguridad.md` § 3 |
+
+**Fallos que se muestran y no se esconden:** TC-018 (falso positivo, § 8) y los timeouts de Gemini
+descritos arriba.
